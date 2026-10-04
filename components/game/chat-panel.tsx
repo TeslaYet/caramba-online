@@ -16,7 +16,7 @@ export function ChatPanel({
   const [text, setText] = useState("");
 
   return (
-    <div className="flex h-full min-h-[220px] flex-col rounded-3xl border border-[var(--line)] bg-[var(--panel)]">
+    <div className="flex h-full min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--panel)]">
       <div className="border-b border-[var(--line)] px-4 py-3 font-display text-lg">
         Table chat
       </div>

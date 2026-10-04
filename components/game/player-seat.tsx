@@ -1,6 +1,5 @@
 "use client";
 
-import { CardBack } from "@/components/cards/playing-card";
 import type { PublicPlayerView } from "@/lib/game/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -25,7 +24,7 @@ export function PlayerSeat({
   return (
     <div
       className={cn(
-        "min-w-[110px] rounded-2xl border-2 px-3 py-2 text-center backdrop-blur",
+        "min-w-[92px] rounded-xl border-2 px-2 py-1 text-center backdrop-blur",
         player.isCurrent
           ? "animate-[pulse-turn_1.6s_ease-in-out_infinite] border-[var(--gold)] bg-[#ffe14a]/20"
           : "border-white/25 bg-[#2a1460]/70",
@@ -34,7 +33,7 @@ export function PlayerSeat({
     >
       <div
         className={cn(
-          "mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-full font-display text-lg text-white",
+          "mx-auto mb-0.5 flex h-7 w-7 items-center justify-center rounded-full font-display text-sm text-white",
           SEAT_COLORS[player.seatIndex % SEAT_COLORS.length],
         )}
       >
@@ -57,15 +56,6 @@ export function PlayerSeat({
         <p className="text-[10px] uppercase tracking-wider text-[var(--danger)]">
           Eliminated
         </p>
-      )}
-      {!isSelf && (
-        <div className="mt-1 flex justify-center -space-x-4">
-          {Array.from({ length: Math.min(player.cardCount, 5) }).map((_, index) => (
-            <div key={index} className="scale-50">
-              <CardBack compact />
-            </div>
-          ))}
-        </div>
       )}
     </div>
   );

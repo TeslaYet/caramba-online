@@ -33,10 +33,10 @@ export function ActionBar({
   const canCallCaramba = discardPhase && handValue <= GAME_RULES.CARAMBA_MAX_HAND;
 
   return (
-    <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-4">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+    <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--panel)] px-3 py-2">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="font-display text-2xl">
+          <p className="font-display text-lg leading-none">
             Your hand: {handValue}
           </p>
           <p className="text-sm text-cream/70">

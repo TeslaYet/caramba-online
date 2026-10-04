@@ -35,10 +35,19 @@ cp .env.example .env.local
 
 ## Supabase setup
 
-1. Create a Supabase project.
-2. Run `supabase/migrations/001_init.sql` in the SQL editor.
-3. Keep Row Level Security enabled. The Next.js server uses the service role key and never sends hidden hands to other clients.
-4. Set the three Supabase environment variables on the host.
+Connect your Supabase account and apply the database in one step:
+
+```bash
+npm run supabase:link
+```
+
+Run it in your own terminal. It opens a browser so you can sign in. It then uses a project named `caramba-online` or `caramba`, or your only project. If you have several, set `SUPABASE_PROJECT_REF` and run it again. If you have none, it creates `caramba-online` in `eu-west-3` (override with `SUPABASE_REGION`).
+
+You can also create a token at https://supabase.com/dashboard/account/tokens and run `SUPABASE_ACCESS_TOKEN=sbp_... npm run supabase:link`.
+
+It writes `.env.local` with the project URL and API keys. Restart `npm run dev` afterward.
+
+The server uses the service role key and never sends hidden hands to other clients. Do not commit `.env.local`.
 
 Without those variables, the app still runs locally with an in-memory store. That store resets when the Node process restarts.
 

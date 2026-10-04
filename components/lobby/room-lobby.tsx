@@ -32,10 +32,10 @@ export function RoomLobby({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-8">
-      <header className="text-center">
+    <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-5xl flex-col gap-3 overflow-hidden px-4 py-4">
+      <header className="shrink-0 text-center">
         <p className="text-sm uppercase tracking-[0.3em] text-gold">Caramba Room</p>
-        <h1 className="font-display text-5xl">Waiting for your friends…</h1>
+        <h1 className="font-display text-4xl leading-none">Waiting for your friends…</h1>
         <p className="mt-2 text-cream/70">Room code: {room.code}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Button variant="gold" onClick={() => copy("code")} data-testid="copy-code">
@@ -47,7 +47,7 @@ export function RoomLobby({
         </div>
       </header>
 
-      <div className="rainbow-rim mx-auto w-full max-w-3xl rounded-[40px]">
+      <div className="rainbow-rim mx-auto w-full max-w-3xl shrink-0 rounded-[32px]">
       <div className="felt-texture grid grid-cols-2 gap-3 rounded-[32px] p-6 sm:grid-cols-4">
         {players.map((player) => (
           <div key={player.id} className="relative">
@@ -92,7 +92,7 @@ export function RoomLobby({
         <p className="text-center text-sm text-[var(--danger)]">{actionError}</p>
       )}
 
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="flex shrink-0 flex-wrap justify-center gap-2">
         <Button
           variant={self?.ready ? "secondary" : "primary"}
           onClick={() => onAction({ type: self?.ready ? "UNREADY" : "READY" })}
@@ -115,10 +115,12 @@ export function RoomLobby({
         </Button>
       </div>
 
-      <ChatPanel
-        messages={game?.chat ?? []}
-        onSend={(text) => onAction({ type: "CHAT", text })}
-      />
+      <div className="min-h-0 flex-1">
+        <ChatPanel
+          messages={game?.chat ?? []}
+          onSend={(text) => onAction({ type: "CHAT", text })}
+        />
+      </div>
     </div>
   );
 }

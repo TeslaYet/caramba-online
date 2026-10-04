@@ -125,14 +125,14 @@ export function GameTable({
   }, [game.nextRoundAt, game.status, onAction]);
 
   return (
-    <div className="relative flex min-h-screen flex-col gap-4 p-3 lg:grid lg:grid-cols-[1fr_320px] lg:p-5">
-      <div className="flex min-h-0 flex-col gap-3">
-        <header className="flex flex-wrap items-center justify-between gap-2">
+    <div className="relative grid h-dvh max-h-dvh grid-rows-[minmax(0,1fr)] overflow-hidden p-2 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-3">
+      <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-gold">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
               Room {game.roomCode}
             </p>
-            <h1 className="font-display text-3xl">
+            <h1 className="font-display text-xl leading-none">
               {game.me?.isCurrent ? "Your turn" : `${game.players.find((p) => p.id === game.currentPlayerId)?.nickname ?? "Player"}'s turn`}
             </h1>
           </div>
@@ -158,14 +158,14 @@ export function GameTable({
           </div>
         </header>
 
-        <div className="relative mx-auto aspect-[1.15] w-full max-w-4xl">
+        <div className="relative min-h-0 w-full flex-1">
           <div className="rainbow-rim absolute inset-[6%] rounded-[50%] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
             <div className="felt-texture h-full w-full rounded-[50%]" />
           </div>
           {seats.map(({ player, angle }) => {
             const rad = ((angle - 90) * Math.PI) / 180;
-            const x = 50 + Math.cos(rad) * 42;
-            const y = 50 + Math.sin(rad) * 38;
+            const x = 50 + Math.cos(rad) * 36;
+            const y = 50 + Math.sin(rad) * 34;
             return (
               <div
                 key={player.id}
@@ -177,7 +177,7 @@ export function GameTable({
             );
           })}
 
-          <div className="absolute left-1/2 top-1/2 flex w-[70%] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
+          <div className="absolute left-1/2 top-1/2 flex max-h-[68%] w-[70%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 overflow-hidden">
             <div className="flex items-end gap-4">
               <div className="text-center">
                 <PlayingCard
@@ -235,7 +235,7 @@ export function GameTable({
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-2" data-testid="player-hand">
+        <div className="flex shrink-0 flex-wrap justify-center gap-1.5 pt-1" data-testid="player-hand">
           {hand.map((card) => (
             <PlayingCard
               key={card.id}
@@ -282,7 +282,7 @@ export function GameTable({
         />
       </div>
 
-      <aside className="hidden flex-col gap-3 lg:flex">
+      <aside className="hidden min-h-0 flex-col gap-2 overflow-y-auto lg:flex">
         <Scoreboard game={game} />
         <ChatPanel
           messages={game.chat}

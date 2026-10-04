@@ -34,6 +34,7 @@ export function PlayingCard({
   eligible = false,
   compact = false,
   label,
+  className,
   onSelect,
 }: {
   card?: Card;
@@ -43,6 +44,7 @@ export function PlayingCard({
   eligible?: boolean;
   compact?: boolean;
   label?: string;
+  className?: string;
   onSelect?: () => void;
 }) {
   const red = card?.color === "red";
@@ -57,7 +59,8 @@ export function PlayingCard({
       aria-label={accessibleLabel}
       className={cn(
         "card-shadow focus-ring relative shrink-0 rounded-[14px] border text-left transition-transform",
-        compact ? "h-20 w-14" : "h-28 w-20 sm:h-32 sm:w-24",
+        compact ? "h-16 w-11" : "h-24 w-[4.25rem]",
+        className,
         faceDown
           ? "border-white/70 bg-[linear-gradient(145deg,#ff4d6d,#7a5cff_45%,#3ee0ff)]"
           : "border-white bg-[#fffdf8]",
