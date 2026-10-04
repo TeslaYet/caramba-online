@@ -1,36 +1,123 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Caramba Online
 
-## Getting Started
+A private, realtime multiplayer card game for 2–8 friends. Create a room, share a code or invite link, and play Caramba on a shared virtual table.
 
-First, run the development server:
+The rules in this repository are the source of truth. They are not imported from any other game named Caramba.
+
+## Requirements
+
+- Node.js 20 or newer
+- npm
+- Optional: a Supabase project for persistent multiplayer across multiple server instances
+
+Local development and end-to-end tests work without Supabase. The app uses an in-memory store and server-sent events until Supabase credentials are provided.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Environment variables
+
+Copy `.env.example` to `.env.local`:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | For hosted persistence | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | For hosted persistence | Public anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Never expose this to the browser |
+| `CARAMBA_TEST_MODE` | Tests only | Set to `1` for Playwright helpers. Do not enable in production. |
+
+## Supabase setup
+
+1. Create a Supabase project.
+2. Run `supabase/migrations/001_init.sql` in the SQL editor.
+3. Keep Row Level Security enabled. The Next.js server uses the service role key and never sends hidden hands to other clients.
+4. Set the three Supabase environment variables on the host.
+
+Without those variables, the app still runs locally with an in-memory store. That store resets when the Node process restarts.
+
+## Database migrations
+
+The initial schema creates:
+
+- `rooms`
+- `players`
+- `games` (authoritative JSONB state + version)
+- `game_events`
+
+Apply `supabase/migrations/001_init.sql` before pointing the app at Supabase.
+
+## Local development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a game in one browser, join from another with the room code, mark guests ready, and start.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Unit tests
 
-## Learn More
+```bash
+npm run test
+```
 
-To learn more about Next.js, take a look at the following resources:
+These cover the deck, card values, sequences, same-rank groups, full-hand discard, Caramba, the 100-point rule, turn order, hidden-hand projection, and fresh decks each round.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## End-to-end tests
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run test:e2e
+```
 
-## Deploy on Vercel
+Playwright starts the app with `CARAMBA_TEST_MODE=1` so the multiplayer flow can arrange known hands.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Production build
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+npm start
+```
+
+## Deployment
+
+1. Deploy the Next.js app (Vercel or any Node host).
+2. Set the environment variables.
+3. Apply the Supabase migration if you want durable rooms across instances.
+4. Do not set `CARAMBA_TEST_MODE` in production.
+5. Never put `SUPABASE_SERVICE_ROLE_KEY` in a `NEXT_PUBLIC_` variable.
+
+For a single-instance hobby deploy, the in-memory store is enough for a private friends night. Use Supabase when you need persistence, reconnects across restarts, or more than one server.
+
+## Architecture
+
+- `lib/game` — pure, testable engine. No React, no network.
+- `lib/server` — room/game service, cookies, locks, validation.
+- `lib/store` — memory store or Supabase.
+- `app/api` — authoritative mutations.
+- `components` — table, cards, lobby, scoreboard.
+
+Clients may request moves. The server validates identity, turn, ownership, combinations, draw rules, and Caramba, then broadcasts a per-player public projection.
+
+## Current rule assumptions
+
+1. A valid discard is 1 card, 2–5 of the same rank, or a 3–5 card same-color sequence.
+2. A player may discard their entire hand if that hand is a legal combination.
+3. After discarding, the player draws exactly 1 card.
+4. A player may take 1 card from the immediately previous player's latest discard group.
+5. A completed turn always ends with at least 1 card.
+6. Ace may be low or high in sequences, but always scores 1.
+7. A new 104-card deck is shuffled before every round.
+8. Caramba can only be called with a hand total of 7 or less. A successful call scores 0.
+9. Failed Caramba = hand value + 30.
+10. Other active players receive their hand value.
+11. Exactly 100 cumulative points becomes 50.
+12. More than 100 eliminates the player.
+13. The match ends when only one active player remains.
