@@ -3,6 +3,8 @@ import { getPlayerId } from "@/lib/server/session";
 import { getRoomSnapshot, markConnected } from "@/lib/server/game-service";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,

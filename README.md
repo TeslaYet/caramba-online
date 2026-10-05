@@ -30,7 +30,8 @@ cp .env.example .env.local
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | For hosted persistence | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | For hosted persistence | Public anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Never expose this to the browser |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Preferred server key. Never expose this to the browser |
+| `CARAMBA_DB_SECRET` | Server only, if no service role key | Must match the secret stored in `private.server_auth` |
 | `CARAMBA_TEST_MODE` | Tests only | Set to `1` for Playwright helpers. Do not enable in production. |
 
 ## Supabase setup

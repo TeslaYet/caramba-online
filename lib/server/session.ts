@@ -26,6 +26,7 @@ export async function ensurePlayerId(): Promise<string> {
   jar.set(PLAYER_COOKIE, playerId, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
@@ -37,6 +38,7 @@ export async function persistNickname(nickname: string): Promise<void> {
   jar.set(NICKNAME_COOKIE, nickname, {
     httpOnly: false,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
