@@ -3,15 +3,6 @@
 import { cn } from "@/lib/utils/cn";
 import type { Card } from "@/lib/game/types";
 
-const SUIT_GLYPH: Record<Card["suit"], string> = {
-  hearts: "M12 21s-7-4.35-9.3-8.1C.4 9.7 1.7 6 5.1 6c1.9 0 3.2 1.2 3.9 2.3C9.7 7.2 11 6 12.9 6c3.4 0 4.7 3.7 2.4 6.9C19 16.65 12 21 12 21z",
-  diamonds: "M12 2 L20 12 L12 22 L4 12 Z",
-  clubs:
-    "M12 8a4 4 0 1 0-3.9 4A4 4 0 1 0 12 16.8 4 4 0 1 0 15.9 12 4 4 0 1 0 12 8zm-1.2 8.6h2.4L14 22h-4z",
-  spades:
-    "M12 2c4.8 5.2 8 8.6 8 12.1A5.1 5.1 0 0 1 12 18.4 5.1 5.1 0 0 1 4 14.1C4 10.6 7.2 7.2 12 2zm-1.2 16.4h2.4L14 22h-4z",
-};
-
 export function SuitIcon({
   suit,
   className,
@@ -21,7 +12,30 @@ export function SuitIcon({
 }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path d={SUIT_GLYPH[suit]} fill="currentColor" />
+      {suit === "hearts" && (
+        <path
+          fill="currentColor"
+          d="M12 21C11 21 3.2 15.2 3.2 9.5 3.2 6.3 5.6 4.2 8.5 4.2c1.7 0 3 0.9 3.5 2.3C12.5 5.1 13.8 4.2 15.5 4.2c2.9 0 5.3 2.1 5.3 5.3C20.8 15.2 13 21 12 21z"
+        />
+      )}
+      {suit === "diamonds" && (
+        <path fill="currentColor" d="M12 2.2 21.2 12 12 21.8 2.8 12z" />
+      )}
+      {suit === "clubs" && (
+        <>
+          <circle cx="12" cy="6.5" r="3.7" fill="currentColor" />
+          <circle cx="7.9" cy="11.7" r="3.7" fill="currentColor" />
+          <circle cx="16.1" cy="11.7" r="3.7" fill="currentColor" />
+          <circle cx="12" cy="11.4" r="2.2" fill="currentColor" />
+          <path fill="currentColor" d="M10.6 14.1h2.8l.8 7.4h-4.4z" />
+        </>
+      )}
+      {suit === "spades" && (
+        <path
+          fill="currentColor"
+          d="M12 2.1C12 2.1 3.6 9.4 3.6 14.4 3.6 17.6 6.1 19.6 9.2 19.6c1.2 0 2.2-.5 2.8-1.3.6.8 1.6 1.3 2.8 1.3 3.1 0 5.6-2 5.6-5.2C20.4 9.4 12 2.1 12 2.1zM10.5 17.4l-.8 4.4h4.6l-.8-4.4z"
+        />
+      )}
     </svg>
   );
 }
@@ -58,7 +72,7 @@ export function PlayingCard({
       aria-pressed={selected}
       aria-label={accessibleLabel}
       className={cn(
-        "card-shadow focus-ring relative shrink-0 rounded-[14px] border text-left transition-transform",
+        "card-shadow focus-ring relative shrink-0 overflow-hidden rounded-[14px] border text-left transition-transform",
         compact ? "h-16 w-11" : "h-24 w-[4.25rem]",
         className,
         faceDown
@@ -73,24 +87,49 @@ export function PlayingCard({
       {faceDown || !card ? (
         <div className="absolute inset-[6px] rounded-[10px] border-2 border-white/70 bg-[repeating-linear-gradient(45deg,#ffe14a_0_7px,#ff4fd8_7px_14px,#3ee0ff_14px_21px)]" />
       ) : (
-        <div
-          className={cn(
-            "flex h-full flex-col justify-between p-1.5 font-display",
-            red ? "text-[#e4234b]" : "text-[#243044]",
-          )}
-        >
-          <div className="flex flex-col leading-none">
-            <span className="text-sm font-bold sm:text-base">{card.rank}</span>
-            <SuitIcon suit={card.suit} className="h-3.5 w-3.5" />
-          </div>
-          <SuitIcon suit={card.suit} className="mx-auto h-7 w-7 opacity-90 sm:h-8 sm:w-8" />
-          <div className="flex rotate-180 flex-col leading-none">
-            <span className="text-sm font-bold sm:text-base">{card.rank}</span>
-            <SuitIcon suit={card.suit} className="h-3.5 w-3.5" />
-          </div>
+        <div className={cn("relative h-full w-full", red ? "text-[#e4234b]" : "text-[#243044]")}>
+          <CornerIndex card={card} compact={compact} />
+          <SuitIcon
+            suit={card.suit}
+            className={cn(
+              "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+              compact ? "h-4 w-4" : "h-7 w-7",
+            )}
+          />
+          <CornerIndex card={card} compact={compact} mirrored />
         </div>
       )}
     </button>
+  );
+}
+
+function CornerIndex({
+  card,
+  compact,
+  mirrored = false,
+}: {
+  card: Card;
+  compact: boolean;
+  mirrored?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "absolute flex flex-col items-center leading-none",
+        mirrored ? "bottom-[2px] right-[2px] rotate-180" : "left-[2px] top-[2px]",
+      )}
+    >
+      <span
+        className={cn(
+          "font-sans font-extrabold tabular-nums leading-none",
+          compact ? "text-[10px]" : "text-[15px]",
+          card.rank === "10" && (compact ? "text-[9px]" : "text-[13px]"),
+        )}
+      >
+        {card.rank}
+      </span>
+      <SuitIcon suit={card.suit} className={compact ? "h-2 w-2" : "mt-px h-3 w-3"} />
+    </div>
   );
 }
 
