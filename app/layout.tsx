@@ -14,8 +14,8 @@ const sans = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Caramba Online",
-  description: "A private multiplayer card game. Keep your hand low. Call Caramba.",
+  title: "Carramba Online",
+  description: "A private multiplayer card game. Keep your hand low. Call Carramba.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

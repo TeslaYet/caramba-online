@@ -5,7 +5,7 @@ export default function HomePage() {
     <main className="mx-auto flex h-dvh w-full max-w-3xl flex-col items-center justify-center overflow-hidden px-6 text-center">
       <p className="text-sm uppercase tracking-[0.4em] text-gold">Play with your friends</p>
       <h1 className="mt-3 bg-gradient-to-r from-[#ffe14a] via-[#ff4fd8] to-[#3ee0ff] bg-clip-text font-display text-6xl tracking-tight text-transparent sm:text-7xl">
-        CARAMBA
+        CARRAMBA
       </h1>
       <p className="mt-4 max-w-md text-lg text-cream/75">
         The lower your hand, the better your chances.

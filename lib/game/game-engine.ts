@@ -485,12 +485,12 @@ export function callCaramba(state: GameState, playerId: string): GameState {
     calculateHandScore(caller.hand) > GAME_RULES.CARAMBA_MAX_HAND
   ) {
     throw new GameEngineError(
-      `You can only call Caramba with a hand of ${GAME_RULES.CARAMBA_MAX_HAND} or less.`,
+      `You can only call Carramba with a hand of ${GAME_RULES.CARAMBA_MAX_HAND} or less.`,
       "INVALID_MOVE",
     );
   }
   if (!canCallCaramba(state, playerId)) {
-    throw new GameEngineError("You cannot call Caramba right now.", "INVALID_MOVE");
+    throw new GameEngineError("You cannot call Carramba right now.", "INVALID_MOVE");
   }
 
   const result = calculateRoundScores(state, playerId);

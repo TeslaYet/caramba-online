@@ -1,8 +1,8 @@
-# Caramba Online
+# Carramba Online
 
-A private, realtime multiplayer card game for 2–8 friends. Create a room, share a code or invite link, and play Caramba on a shared virtual table.
+A private, realtime multiplayer card game for 2–8 friends. Create a room, share a code or invite link, and play Carramba on a shared virtual table.
 
-The rules in this repository are the source of truth. They are not imported from any other game named Caramba.
+The rules in this repository are the source of truth. They are not imported from any other game named Carramba.
 
 ## Requirements
 
@@ -79,7 +79,7 @@ Create a game in one browser, join from another with the room code, mark guests 
 npm run test
 ```
 
-These cover the deck, card values, sequences, same-rank groups, full-hand discard, Caramba, the 100-point rule, turn order, hidden-hand projection, and fresh decks each round.
+These cover the deck, card values, sequences, same-rank groups, full-hand discard, Carramba, the 100-point rule, turn order, hidden-hand projection, and fresh decks each round.
 
 ## End-to-end tests
 
@@ -114,7 +114,7 @@ For a single-instance hobby deploy, the in-memory store is enough for a private 
 - `app/api` — authoritative mutations.
 - `components` — table, cards, lobby, scoreboard.
 
-Clients may request moves. The server validates identity, turn, ownership, combinations, draw rules, and Caramba, then broadcasts a per-player public projection.
+Clients may request moves. The server validates identity, turn, ownership, combinations, draw rules, and Carramba, then broadcasts a per-player public projection.
 
 ## Current rule assumptions
 
@@ -125,8 +125,8 @@ Clients may request moves. The server validates identity, turn, ownership, combi
 5. A completed turn always ends with at least 1 card.
 6. Ace may be low or high in sequences, but always scores 1.
 7. A new 104-card deck is shuffled before every round.
-8. Caramba can only be called with a hand total of 7 or less. A successful call scores 0.
-9. Failed Caramba = hand value + 30.
+8. Carramba can only be called with a hand total of 7 or less. A successful call scores 0.
+9. Failed Carramba = hand value + 30.
 10. Other active players receive their hand value.
 11. Exactly 100 cumulative points becomes 50.
 12. More than 100 eliminates the player.

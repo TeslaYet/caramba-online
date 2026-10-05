@@ -27,7 +27,7 @@ export function resolveCaramba(
   const active = getActivePlayers(state);
   const caller = active.find((player) => player.id === callerId);
   if (!caller) {
-    throw new Error("Only an active player can call Caramba.");
+    throw new Error("Only an active player can call Carramba.");
   }
 
   const callerValue = calculateHandScore(caller.hand);

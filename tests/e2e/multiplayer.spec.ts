@@ -32,7 +32,7 @@ async function joinRoom(page: Page, nickname: string, code: string) {
   await page.waitForURL(new RegExp(`/room/${code}`));
 }
 
-test("friends can play a realtime Caramba match", async ({ browser }) => {
+test("friends can play a realtime Carramba match", async ({ browser }) => {
   test.setTimeout(90_000);
   const hostContext = await browser.newContext();
   const guestContext = await browser.newContext();
@@ -120,8 +120,8 @@ test("friends can play a realtime Caramba match", async ({ browser }) => {
   await expect(host.getByRole("heading", { name: "Your turn" })).toBeVisible();
   await host.getByTestId("caramba-button").click();
   await host.getByTestId("confirm-caramba").click();
-  await expect(host.getByText("called Caramba")).toBeVisible();
-  await expect(guest.getByText("called Caramba")).toBeVisible();
+  await expect(host.getByText("called Carramba")).toBeVisible();
+  await expect(guest.getByText("called Carramba")).toBeVisible();
   await expect(host.getByLabel("8 of spades").first()).toBeVisible();
   await expect(guest.getByLabel("2 of spades").first()).toBeVisible();
 

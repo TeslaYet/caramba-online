@@ -34,7 +34,7 @@ export function RoomLobby({
   return (
     <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-5xl flex-col gap-3 overflow-hidden px-4 py-4">
       <header className="shrink-0 text-center">
-        <p className="text-sm uppercase tracking-[0.3em] text-gold">Caramba Room</p>
+        <p className="text-sm uppercase tracking-[0.3em] text-gold">Carramba Room</p>
         <h1 className="font-display text-4xl leading-none">Waiting for your friends…</h1>
         <p className="mt-2 text-cream/70">Room code: {room.code}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">

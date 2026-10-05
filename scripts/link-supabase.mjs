@@ -162,7 +162,7 @@ function projectRef(project) {
 
 async function applyMigration(token, ref) {
   const sql = readFileSync(path.join(root, "supabase", "migrations", "001_init.sql"), "utf8");
-  console.log("Applying the Caramba database migration...");
+  console.log("Applying the Carramba database migration...");
   await management(token, `/v1/projects/${ref}/database/query`, {
     method: "POST",
     body: JSON.stringify({ query: sql }),

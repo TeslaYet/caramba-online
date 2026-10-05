@@ -241,7 +241,7 @@ describe("caramba and scoring", () => {
     expect(game.players[0]?.lastRoundScore).toBe(36);
   });
 
-  it("rejects Caramba when the hand is above 7", () => {
+  it("rejects Carramba when the hand is above 7", () => {
     const game = {
       ...arrangeTestHands(makeGame(), {
         "player-1": [card("hearts", "8")],
@@ -299,7 +299,7 @@ describe("projection", () => {
     expect("drawPile" in view).toBe(false);
   });
 
-  it("reveals hands after Caramba", () => {
+  it("reveals hands after Carramba", () => {
     let game = arrangeTestHands(makeGame(), {
       "player-1": [card("hearts", "A")],
       "player-2": [card("clubs", "9")],

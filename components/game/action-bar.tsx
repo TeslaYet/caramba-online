@@ -51,7 +51,7 @@ export function ActionBar({
           )}
           {discardPhase && !canCallCaramba && (
             <p className="text-xs text-cream/70">
-              Caramba needs {GAME_RULES.CARAMBA_MAX_HAND} or less.
+              Carramba needs {GAME_RULES.CARAMBA_MAX_HAND} or less.
             </p>
           )}
         </div>
@@ -93,7 +93,7 @@ export function ActionBar({
           disabled={!canCallCaramba}
           data-testid="caramba-button"
         >
-          CARAMBA
+          CARRAMBA
         </Button>
       </div>
     </section>

@@ -23,16 +23,16 @@ export function RoundEndOverlay({
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--line)] pop-panel p-6">
-        <p className="text-sm uppercase tracking-[0.3em] text-gold">Caramba!</p>
+        <p className="text-sm uppercase tracking-[0.3em] text-gold">Carramba!</p>
         <h2 className="font-display text-4xl">
-          {result.callerNickname} called Caramba.
+          {result.callerNickname} called Carramba.
         </h2>
         <p className="mt-2 text-cream/80">
           {result.success
-            ? "CARAMBA SUCCESS. The caller scores 0."
+            ? "CARRAMBA SUCCESS. The caller scores 0."
             : result.reason === "TIED_LOWEST"
-              ? "CARAMBA FAILED. Another player had the same hand value."
-              : "CARAMBA FAILED. Another player had a lower hand."}
+              ? "CARRAMBA FAILED. Another player had the same hand value."
+              : "CARRAMBA FAILED. Another player had a lower hand."}
         </p>
         <div className="mt-5 space-y-3">
           {result.lines.map((line) => (
@@ -142,7 +142,7 @@ export function CarambaConfirm({
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-3xl border border-[var(--line)] pop-panel p-6">
-        <h2 className="font-display text-3xl">Call CARAMBA?</h2>
+        <h2 className="font-display text-3xl">Call CARRAMBA?</h2>
         <p className="mt-2 text-cream/80">
           Your current hand: <strong>{handValue} points</strong>
         </p>
@@ -156,7 +156,7 @@ export function CarambaConfirm({
             Cancel
           </Button>
           <Button variant="gold" onClick={onConfirm} data-testid="confirm-caramba">
-            CARAMBA
+            CARRAMBA
           </Button>
         </div>
       </div>

@@ -5,7 +5,7 @@ export default function RulesPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-6 py-12">
       <p className="text-sm uppercase tracking-[0.3em] text-gold">How to play</p>
-      <h1 className="font-display text-6xl">Caramba</h1>
+      <h1 className="font-display text-6xl">Carramba</h1>
       <div className="prose-caramba mt-8 space-y-8 text-cream/85">
         <section>
           <h2 className="font-display text-3xl text-cream">Objective</h2>
@@ -47,9 +47,9 @@ draw 1
           </pre>
         </section>
         <section>
-          <h2 className="font-display text-3xl text-cream">Caramba</h2>
+          <h2 className="font-display text-3xl text-cream">Carramba</h2>
           <p>
-            You can call Caramba only when your hand totals 7 or less. Strictly
+            You can call Carramba only when your hand totals 7 or less. Strictly
             lowest hand = 0 points. Tie or higher hand = hand value + 30.
           </p>
         </section>
