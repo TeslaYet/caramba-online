@@ -8,3 +8,9 @@ export function createBrowserSupabase() {
   }
   return createClient(url, anonKey);
 }
+
+export async function authHeaders(): Promise<Record<string, string>> {
+  const supabase = createBrowserSupabase();
+  const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+}

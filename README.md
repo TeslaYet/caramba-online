@@ -61,7 +61,17 @@ The initial schema creates:
 - `games` (authoritative JSONB state + version)
 - `game_events`
 
-Apply `supabase/migrations/001_init.sql` before pointing the app at Supabase.
+Apply `supabase/migrations/001_init.sql`, `002_server_gate.sql`, and `003_accounts_matchmaking.sql` before pointing the app at Supabase.
+
+Accounts use Supabase Auth. Private tables still work without signing in. Casual and ranked matchmaking require an account. New profiles start at 1200 rating on the free plan.
+
+Ad-free access is stored on `profiles.entitlement` (`FREE`, `AD_FREE`, or `PREMIUM`). The app cannot grant it. Give a friend ad-free access from the Supabase SQL editor:
+
+```sql
+update public.profiles
+set entitlement = 'AD_FREE'
+where username = 'friendname';
+```
 
 ## Local development
 
@@ -105,6 +115,10 @@ npm start
 5. Never put `SUPABASE_SERVICE_ROLE_KEY` in a `NEXT_PUBLIC_` variable.
 
 For a single-instance hobby deploy, the in-memory store is enough for a private friends night. Use Supabase when you need persistence, reconnects across restarts, or more than one server.
+
+## Security
+
+Anonymous players are identified by a signed httpOnly cookie, not by a nickname and not by a player id copied from the table. Hidden hands are removed before a response leaves the server. Room and game responses are `private, no-store`. The database rejects the public Supabase key unless the request also carries the server-only `CARAMBA_DB_SECRET`. See `SECURITY_AUDIT.md`.
 
 ## Architecture
 

@@ -16,7 +16,7 @@ export function errorResponse(error: unknown): Response {
       { status: error.status },
     );
   }
-  console.error(error);
+  console.error(error instanceof Error ? `${error.name}: ${error.message.replace(/Bearer\s+\S+/gi, "Bearer [redacted]")}` : "Server error");
   return Response.json(
     { error: "Something went wrong. Please try again.", code: "SERVER_ERROR" },
     { status: 500 },

@@ -45,7 +45,7 @@ export const RULE_ASSUMPTIONS = [
   "Successful Carramba = 0 round points for caller.",
   "Failed Carramba = caller hand value + 30.",
   "Other active players receive their hand value.",
-  "Exactly 100 cumulative points becomes 50.",
-  "More than 100 eliminates the player.",
+  "The default table eliminates a player above 100 and resets an exact 100 to 50. The host can choose another maximum and reset before the game starts.",
+  "A score below the maximum stays. An exact maximum becomes the reset score. A score above the maximum eliminates the player.",
   "The game ends when only one active player remains.",
 ] as const;

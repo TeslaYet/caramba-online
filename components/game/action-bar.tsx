@@ -1,6 +1,8 @@
 "use client";
 
+import { useAdaptiveDevice } from "@/components/providers/adaptive-device";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
 import { GAME_RULES } from "@/lib/game/rules";
 import type { DiscardValidation, PublicGameState } from "@/lib/game/types";
 import { describeDiscard } from "@/lib/game/validators";
@@ -10,7 +12,6 @@ export function ActionBar({
   validation,
   selectedCount,
   remainingValue,
-  canTake,
   onPlay,
   onDraw,
   onTake,
@@ -20,7 +21,6 @@ export function ActionBar({
   validation: DiscardValidation;
   selectedCount: number;
   remainingValue: number | null;
-  canTake: boolean;
   onPlay: () => void;
   onDraw: () => void;
   onTake: () => void;
@@ -30,7 +30,10 @@ export function ActionBar({
   const discardPhase = mine && game.turnPhase === "DISCARD";
   const drawPhase = mine && game.turnPhase === "DRAW";
   const handValue = game.me?.handValue ?? 0;
+  const canTakeDiscard = drawPhase && Boolean(game.eligibleDiscardGroupId);
   const canCallCaramba = discardPhase && handValue <= GAME_RULES.CARAMBA_MAX_HAND;
+  const { hasHover } = useAdaptiveDevice();
+  const verb = hasHover ? "Click" : "Tap";
 
   return (
     <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--panel)] px-3 py-2">
@@ -49,13 +52,18 @@ export function ActionBar({
           {remainingValue !== null && selectedCount > 0 && (
             <p className="text-xs text-gold">Remaining after discard: {remainingValue}</p>
           )}
+          {drawPhase && (
+            <p className="text-xs text-cream/70">
+              {verb} a discard card twice, or press Take Discard.
+            </p>
+          )}
           {discardPhase && !canCallCaramba && (
             <p className="text-xs text-cream/70">
               Carramba needs {GAME_RULES.CARAMBA_MAX_HAND} or less.
             </p>
           )}
         </div>
-        <p className="text-sm uppercase tracking-[0.2em] text-gold">
+        <p className="hidden text-sm uppercase tracking-[0.2em] text-gold sm:block">
           {game.me?.isCurrent
             ? game.turnPhase === "DRAW"
               ? "Draw one card"
@@ -65,13 +73,15 @@ export function ActionBar({
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Button
+          className={cn("max-sm:min-h-11", (!discardPhase || !validation.valid) && "max-sm:hidden")}
           onClick={onPlay}
           disabled={!discardPhase || !validation.valid}
           data-testid="play-button"
         >
-          Play
+          {selectedCount > 0 ? `Play ${selectedCount}` : "Play"}
         </Button>
         <Button
+          className={cn("max-sm:min-h-11", !drawPhase && "max-sm:hidden")}
           variant="secondary"
           onClick={onDraw}
           disabled={!drawPhase}
@@ -80,14 +90,16 @@ export function ActionBar({
           Draw from Deck
         </Button>
         <Button
+          className={cn("max-sm:min-h-11", !canTakeDiscard && "max-sm:hidden")}
           variant="secondary"
           onClick={onTake}
-          disabled={!drawPhase || !canTake}
-          data-testid="take-button"
+          disabled={!canTakeDiscard}
+          data-testid="take-discard-button"
         >
           Take Discard
         </Button>
         <Button
+          className={cn("max-sm:min-h-11", !canCallCaramba && "max-sm:hidden")}
           variant="gold"
           onClick={onCaramba}
           disabled={!canCallCaramba}

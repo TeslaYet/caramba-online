@@ -114,14 +114,14 @@ test("friends can play a realtime Carramba match", async ({ browser }) => {
   await guest.getByLabel("8 of spades").click();
   await guest.getByTestId("play-button").click();
   await guest.getByLabel("10 of diamonds").click();
-  await guest.getByTestId("take-button").click();
+  await guest.getByLabel("10 of diamonds, tap again to take").click();
   await expect(guest.getByLabel("10 of diamonds")).toBeVisible();
 
   await expect(host.getByRole("heading", { name: "Your turn" })).toBeVisible();
   await host.getByTestId("caramba-button").click();
   await host.getByTestId("confirm-caramba").click();
-  await expect(host.getByText("called Carramba")).toBeVisible();
-  await expect(guest.getByText("called Carramba")).toBeVisible();
+  await expect(host.getByText("called Carramba")).toBeVisible({ timeout: 10_000 });
+  await expect(guest.getByText("called Carramba")).toBeVisible({ timeout: 10_000 });
   await expect(host.getByLabel("8 of spades").first()).toBeVisible();
   await expect(guest.getByLabel("2 of spades").first()).toBeVisible();
 

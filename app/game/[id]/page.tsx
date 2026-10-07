@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { GameTable } from "@/components/game/game-table";
 import { useRoom } from "@/lib/realtime/use-room";
 import type { PublicGameState } from "@/lib/game/types";
@@ -25,7 +26,8 @@ export default function GamePage() {
 
   if (!code) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3">
+        <BrandMark />
         Restoring the table…
       </main>
     );
@@ -52,7 +54,7 @@ function ConnectedGame({
   onLeave: () => void;
   onLobby: (code: string) => void;
 }) {
-  const { snapshot, act, error } = useRoom(code);
+  const { snapshot, act, error, actionError } = useRoom(code);
   const game = snapshot?.game ?? fallback;
 
   if (error) {
@@ -89,6 +91,7 @@ function ConnectedGame({
         await act({ type: "LEAVE" });
         onLeave();
       }}
+      actionError={actionError}
     />
   );
 }

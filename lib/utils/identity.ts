@@ -3,7 +3,10 @@ import { GAME_RULES } from "@/lib/game/rules";
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export function normalizeNickname(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
+  return value
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 export function isValidNickname(value: string): boolean {

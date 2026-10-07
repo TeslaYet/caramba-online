@@ -47,6 +47,8 @@ export function PlayingCard({
   faceDown = false,
   eligible = false,
   compact = false,
+  mini = false,
+  decorative = false,
   label,
   className,
   onSelect,
@@ -57,12 +59,56 @@ export function PlayingCard({
   faceDown?: boolean;
   eligible?: boolean;
   compact?: boolean;
+  mini?: boolean;
+  decorative?: boolean;
   label?: string;
   className?: string;
   onSelect?: () => void;
 }) {
   const red = card?.color === "red";
   const accessibleLabel = label ?? (card ? `${card.rank} of ${card.suit}` : "Face-down card");
+  const classes = cn(
+    mini ? "card-shadow-mini rounded-[10px]" : "card-shadow rounded-[14px]",
+    "focus-ring relative shrink-0 touch-manipulation overflow-hidden border text-left transition-transform",
+    mini ? "h-12 w-8" : compact ? "h-20 w-14 sm:h-16 sm:w-11" : "h-24 w-[4.25rem]",
+    className,
+    faceDown || !card
+      ? "border-white/70 bg-[linear-gradient(145deg,var(--serape),#f08a2a_45%,var(--accent))]"
+      : "border-white bg-[#fffdf8]",
+    selected && "-translate-y-4 ring-4 ring-[var(--gold)]",
+    eligible && "ring-4 ring-[var(--lime)]",
+    onSelect && !disabled && "card-hover",
+    disabled && !decorative && "opacity-70",
+  );
+  const face =
+    faceDown || !card ? (
+      <div
+        className={cn(
+          "absolute border-white/70 bg-[repeating-linear-gradient(45deg,#ffc533_0_7px,#e23b2f_7px_14px,#2f9e4a_14px_21px)]",
+          mini ? "inset-[3px] rounded-[6px] border" : "inset-[6px] rounded-[10px] border-2",
+        )}
+      />
+    ) : (
+      <div className={cn("relative h-full w-full", red ? "text-[#e4234b]" : "text-[#243044]")}>
+        <CornerIndex card={card} compact={compact || mini} />
+        <SuitIcon
+          suit={card.suit}
+          className={cn(
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+            mini ? "h-3 w-3" : compact ? "h-4 w-4" : "h-7 w-7",
+          )}
+        />
+        <CornerIndex card={card} compact={compact || mini} mirrored />
+      </div>
+    );
+
+  if (decorative) {
+    return (
+      <div aria-hidden className={classes}>
+        {face}
+      </div>
+    );
+  }
 
   return (
     <button
@@ -71,34 +117,9 @@ export function PlayingCard({
       onClick={onSelect}
       aria-pressed={selected}
       aria-label={accessibleLabel}
-      className={cn(
-        "card-shadow focus-ring relative shrink-0 overflow-hidden rounded-[14px] border text-left transition-transform",
-        compact ? "h-16 w-11" : "h-24 w-[4.25rem]",
-        className,
-        faceDown
-          ? "border-white/70 bg-[linear-gradient(145deg,#ff4d6d,#7a5cff_45%,#3ee0ff)]"
-          : "border-white bg-[#fffdf8]",
-        selected && "-translate-y-4 ring-4 ring-[var(--gold)]",
-        eligible && "ring-4 ring-[var(--lime)]",
-        onSelect && !disabled && "hover:-translate-y-2 hover:rotate-1",
-        disabled && "opacity-70",
-      )}
+      className={classes}
     >
-      {faceDown || !card ? (
-        <div className="absolute inset-[6px] rounded-[10px] border-2 border-white/70 bg-[repeating-linear-gradient(45deg,#ffe14a_0_7px,#ff4fd8_7px_14px,#3ee0ff_14px_21px)]" />
-      ) : (
-        <div className={cn("relative h-full w-full", red ? "text-[#e4234b]" : "text-[#243044]")}>
-          <CornerIndex card={card} compact={compact} />
-          <SuitIcon
-            suit={card.suit}
-            className={cn(
-              "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-              compact ? "h-4 w-4" : "h-7 w-7",
-            )}
-          />
-          <CornerIndex card={card} compact={compact} mirrored />
-        </div>
-      )}
+      {face}
     </button>
   );
 }

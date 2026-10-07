@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -72,7 +73,8 @@ function JoinForm() {
 
 export default function JoinLobbyPage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
+    <main className="safe-screen mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center">
+      <BrandMark className="mb-4 self-center" />
       <p className="text-sm uppercase tracking-[0.3em] text-gold">Sit down</p>
       <h1 className="font-display text-5xl">Join Game</h1>
       <Suspense>

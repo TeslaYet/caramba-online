@@ -11,12 +11,13 @@ export async function GET(
     const { id } = await context.params;
     const playerId = await getPlayerId();
     const game = await getStore().getGame(id);
-    if (!game) {
+    if (!game || !playerId || !game.players.some((player) => player.id === playerId)) {
       throw new HttpError("That game was not found.", 404, "NOT_FOUND");
     }
-    return Response.json({
-      game: getPublicGameStateForPlayer(game, playerId),
-    });
+    return Response.json(
+      { game: getPublicGameStateForPlayer(game, playerId) },
+      { headers: { "Cache-Control": "private, no-store", Vary: "Cookie" } },
+    );
   } catch (error) {
     return errorResponse(error);
   }

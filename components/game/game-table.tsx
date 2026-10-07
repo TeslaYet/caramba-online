@@ -1,17 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { PlayingCard } from "@/components/cards/playing-card";
 import { ActionBar } from "@/components/game/action-bar";
-import { CarambaConfirm, GameOverOverlay, RoundEndOverlay } from "@/components/game/overlays";
+import { TableMotion } from "@/components/game/table-motion";
+import { useTableCues } from "@/components/game/use-table-cues";
+import { CarambaConfirm, RoundEndOverlay } from "@/components/game/overlays";
+import { CarrambaAnnouncement, showdownAnnouncement } from "@/components/game/carramba-showdown";
+import { useCarrambaShowdown } from "@/components/game/use-carramba-showdown";
+import { WinnerCelebration } from "@/components/game/winner-celebration";
+import { useWinnerCelebration } from "@/components/game/use-winner-celebration";
+import { OpponentHand } from "@/components/game/opponent-hand";
 import { PlayerSeat } from "@/components/game/player-seat";
+import { showdownFacesVisible } from "@/lib/ui/carramba-showdown";
+import { seatSide } from "@/lib/ui/hidden-hand";
+import { cn } from "@/lib/utils/cn";
 import { ChatPanel } from "@/components/game/chat-panel";
 import { Scoreboard } from "@/components/scoreboard/scoreboard";
 import { Button } from "@/components/ui/button";
 import { calculateHandScore } from "@/lib/game/scoring";
 import type { Card, PublicGameState } from "@/lib/game/types";
 import { validateDiscard } from "@/lib/game/validators";
+import { useAdaptiveDevice } from "@/components/providers/adaptive-device";
 import { usePreferences } from "@/components/providers/preferences-provider";
+import { latestOtherMessage, unreadCount } from "@/lib/ui/chat-notice";
 
 const ANGLES = [
   [90],
@@ -28,13 +41,25 @@ export function GameTable({
   game,
   onAction,
   onLeave,
+  actionError,
 }: {
   game: PublicGameState;
   onAction: (payload: Record<string, unknown>) => Promise<unknown>;
   onLeave: () => void;
+  actionError?: string | null;
 }) {
   const { playSound, sound, setSound, reduceMotion, setReduceMotion } =
     usePreferences();
+  const { hasHover, isDesktop } = useAdaptiveDevice();
+  const showdown = useCarrambaShowdown(game, reduceMotion);
+  const facesVisible = showdownFacesVisible(showdown);
+  const celebration = useWinnerCelebration(
+    game,
+    reduceMotion,
+    showdown !== null && showdown !== "result",
+  );
+  const deferScores = showdown !== null && showdown !== "result";
+  const cues = useTableCues(game);
   const [selected, setSelected] = useState<string[]>([]);
   const [pickupId, setPickupId] = useState<string | null>(null);
   const [selectionEpoch, setSelectionEpoch] = useState(
@@ -50,9 +75,30 @@ export function GameTable({
   const [confirmCaramba, setConfirmCaramba] = useState(false);
   const [showBoard, setShowBoard] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const latestChat = game.chat.at(-1)?.timestamp ?? 0;
+  const [readMark, setReadMark] = useState(0);
+  const chatNotice = useRef(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   const me = game.me;
+  const chatOpen = isDesktop || showChat;
+  if (chatOpen && readMark !== latestChat) {
+    setReadMark(latestChat);
+  }
+  const unread = chatOpen ? 0 : unreadCount(game.chat, me?.id ?? null, readMark);
+  const otherMessage = latestOtherMessage(game.chat, me?.id ?? null);
+
+  useEffect(() => {
+    if (!chatNotice.current) {
+      chatNotice.current = true;
+      return;
+    }
+    if (unread > 0) {
+      playSound("notification");
+    }
+  }, [unread, playSound]);
+  const meLine = game.roundResult?.lines.find((line) => line.playerId === me?.id);
+  const shownScore = deferScores && meLine ? meLine.previousTotal : me?.score ?? 0;
   const hand = me?.hand ?? [];
   const selectedCards = hand.filter((card) => selected.includes(card.id));
   const validation = validateDiscard(selectedCards);
@@ -84,9 +130,60 @@ export function GameTable({
     if (!canDrawFromDeck) {
       return;
     }
-    playSound("draw");
     await onAction({ type: "DRAW_FROM_DECK" });
   }
+
+  function submitTake(cardId: string) {
+    void onAction({ type: "TAKE_FROM_PREVIOUS_DISCARD", cardId });
+  }
+
+  function takeDiscard(cardId: string) {
+    if (pickupId !== cardId) {
+      setPickupId(cardId);
+      return;
+    }
+    setPickupId(null);
+    submitTake(cardId);
+  }
+
+  function takeDiscardButton() {
+    const group = game.discardGroups.find((entry) => entry.id === game.eligibleDiscardGroupId);
+    const card = group?.cards[0];
+    if (!card) {
+      return;
+    }
+    setPickupId(null);
+    submitTake(card.id);
+  }
+
+  function seatOffset(playerId: string) {
+    const seat = seats.find((entry) => entry.player.id === playerId);
+    const rad = (((seat?.angle ?? 90) - 90) * Math.PI) / 180;
+    return { x: Math.cos(rad) * 150, y: Math.sin(rad) * 100 };
+  }
+
+  function noticeFor(playerId: string) {
+    const cue = [...cues].reverse().find((entry) => "actorId" in entry && entry.actorId === playerId);
+    if (!cue) {
+      return null;
+    }
+    if (cue.kind === "discard") {
+      return "Discarded";
+    }
+    if (cue.kind === "draw") {
+      return "Drew";
+    }
+    if (cue.kind === "pickup") {
+      return "Took a card";
+    }
+    if (cue.kind === "caramba") {
+      return "Carramba";
+    }
+    return null;
+  }
+
+  const turnName =
+    game.players.find((player) => player.id === game.currentPlayerId)?.nickname ?? "Waiting";
 
   const eligibleGroup =
     game.discardGroups.find((group) => group.id === game.eligibleDiscardGroupId) ??
@@ -102,11 +199,45 @@ export function GameTable({
   const nickname = (playerId: string) =>
     game.players.find((player) => player.id === playerId)?.nickname ?? "Player";
 
+  const showdownSeen = useRef<typeof showdown>(null);
+  useEffect(() => {
+    if (showdownSeen.current && showdownSeen.current !== "result" && showdown === "result") {
+      playSound("result");
+    }
+    showdownSeen.current = showdown;
+  }, [showdown, playSound]);
+
+  const winnerHeard = useRef(false);
+  useEffect(() => {
+    if (winnerHeard.current || !celebration.fresh || !celebration.phase) {
+      return;
+    }
+    const reveal = celebration.phase === "name" || (reduceMotion && celebration.phase === "settled");
+    if (!reveal) {
+      return;
+    }
+    winnerHeard.current = true;
+    playSound("victory");
+  }, [celebration.fresh, celebration.phase, playSound, reduceMotion]);
+
   useEffect(() => {
     if (game.me?.isCurrent && game.status === "PLAYING") {
       playSound("turn");
     }
   }, [game.currentPlayerId, game.status, game.me?.isCurrent, playSound]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+      setConfirmCaramba(false);
+      setShowBoard(false);
+      setShowChat(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!game.nextRoundAt) {
@@ -125,60 +256,165 @@ export function GameTable({
   }, [game.nextRoundAt, game.status, onAction]);
 
   return (
-    <div className="relative grid h-dvh max-h-dvh grid-rows-[minmax(0,1fr)] overflow-hidden p-2 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-3">
+    <div className="safe-screen relative grid h-dvh max-h-dvh grid-rows-[minmax(0,1fr)] overflow-hidden lg:grid-cols-[minmax(0,1fr)_280px]">
       <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
-              Room {game.roomCode}
-            </p>
-            <h1 className="font-display text-xl leading-none">
-              {game.me?.isCurrent ? "Your turn" : `${game.players.find((p) => p.id === game.currentPlayerId)?.nickname ?? "Player"}'s turn`}
-            </h1>
+          <div className="flex items-center gap-2">
+            <BrandMark className="h-9 w-9" />
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
+                Room {game.roomCode}
+              </p>
+              <h1 className="font-display text-xl leading-none">
+                {game.me?.isCurrent ? "Your turn" : `${game.players.find((p) => p.id === game.currentPlayerId)?.nickname ?? "Player"}'s turn`}
+              </h1>
+              <p className="text-xs text-cream/70 sm:hidden">{shownScore} pts</p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => setSound(!sound)}>
-              Sound: {sound ? "ON" : "OFF"}
+          <div className="flex flex-wrap justify-end gap-1 sm:gap-2">
+            <Button variant="ghost" className="px-2.5 py-1.5 text-xs sm:px-3 sm:py-2.5 sm:text-sm" onClick={() => setSound(!sound)}>
+              <span className="sm:hidden">{sound ? "Sound" : "Muted"}</span>
+              <span className="hidden sm:inline">Sound: {sound ? "ON" : "OFF"}</span>
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setReduceMotion(!reduceMotion)}
-            >
-              {reduceMotion ? "Animations off" : "Reduce animations"}
+            <Button variant="ghost" className="px-2.5 py-1.5 text-xs sm:px-3 sm:py-2.5 sm:text-sm" onClick={() => setReduceMotion(!reduceMotion)}>
+              <span className="sm:hidden">{reduceMotion ? "Still" : "Motion"}</span>
+              <span className="hidden sm:inline">
+                {reduceMotion ? "Animations off" : "Reduce animations"}
+              </span>
             </Button>
-            <Button variant="ghost" className="lg:hidden" onClick={() => setShowBoard(true)}>
+            <Button variant="ghost" className="px-2.5 py-1.5 text-xs sm:px-4 sm:py-2.5 sm:text-sm lg:hidden" onClick={() => setShowBoard(true)}>
               Scores
             </Button>
-            <Button variant="ghost" className="lg:hidden" onClick={() => setShowChat(true)}>
-              Chat
+            <Button variant="ghost" className="relative px-2.5 py-1.5 text-xs sm:px-4 sm:py-2.5 sm:text-sm lg:hidden" onClick={() => setShowChat(true)} data-testid="chat-button">
+              Chat{unread > 0 ? ` · ${unread}` : ""}
+              {unread > 0 && (
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--gold)]" />
+              )}
             </Button>
-            <Button variant="ghost" onClick={onLeave}>
+            <Button variant="ghost" className="px-2.5 py-1.5 text-xs sm:px-4 sm:py-2.5 sm:text-sm" onClick={onLeave}>
               Leave
             </Button>
           </div>
+          {unread > 0 && otherMessage && (
+            <p className="w-full truncate text-right text-[11px] text-gold lg:hidden" data-testid="chat-notice">
+              New message · {otherMessage.nickname}: {otherMessage.text}
+            </p>
+          )}
         </header>
 
-        <div className="relative min-h-0 w-full flex-1">
+        <div className="flex shrink-0 gap-3 overflow-x-auto pb-1 sm:hidden">
+          {seats
+            .filter((seat) => seat.player.id !== me?.id)
+            .map(({ player }) => (
+              <div
+                key={player.id}
+                className={cn(
+                  "flex shrink-0 flex-col items-center rounded-2xl border px-2 py-1",
+                  player.isCurrent ? "border-[var(--gold)] bg-[var(--gold)]/15" : "border-white/15 bg-black/20",
+                  player.eliminated && "opacity-60 grayscale",
+                )}
+              >
+                <OpponentHand
+                  playerId={player.id}
+                  nickname={player.nickname}
+                  count={player.cardCount}
+                  cards={facesVisible ? player.hand : null}
+                  orientation="horizontal"
+                  toward="down"
+                  active={player.isCurrent || game.roundResult?.callerId === player.id}
+                  eliminated={player.eliminated}
+                  size="strip"
+                  flip={showdown === "reveal" && !reduceMotion}
+                />
+                <p className="max-w-[6.5rem] truncate text-[11px] font-semibold">{player.nickname}</p>
+                <HandValue playerId={player.id} game={game} facesVisible={facesVisible} />
+                <p className="text-[10px] tabular-nums text-cream/70">
+                  {player.cardCount}
+                  {noticeFor(player.id) ? ` · ${noticeFor(player.id)}` : ""}
+                </p>
+              </div>
+            ))}
+        </div>
+
+        <div className={cn("table-stage relative min-h-0 w-full flex-1", showdown === "announce" && !reduceMotion && "carramba-stage")}>
           <div className="rainbow-rim absolute inset-[6%] rounded-[50%] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
             <div className="felt-texture h-full w-full rounded-[50%]" />
           </div>
-          {seats.map(({ player, angle }) => {
+          {seats.map(({ player, angle }, index) => {
+            const side = seatSide(angle);
             const rad = ((angle - 90) * Math.PI) / 180;
             const x = 50 + Math.cos(rad) * 36;
-            const y = 50 + Math.sin(rad) * 34;
+            const y = 50 + Math.sin(rad) * 30;
+            const isSelf = player.id === me?.id;
+            const line = game.roundResult?.lines.find((entry) => entry.playerId === player.id);
+            const seated = deferScores && line
+              ? {
+                  ...player,
+                  score: line.previousTotal,
+                  lastRoundScore: null,
+                  eliminated: player.eliminated && !line.eliminatedThisRound,
+                }
+              : player;
             return (
               <div
                 key={player.id}
-                className="absolute -translate-x-1/2 -translate-y-1/2"
+                className={cn(
+                  "pointer-events-none absolute hidden -translate-x-1/2 -translate-y-1/2 sm:block",
+                  facesVisible ? "z-30" : "z-20",
+                )}
                 style={{ left: `${x}%`, top: `${y}%` }}
               >
-                <PlayerSeat player={player} isSelf={player.id === me?.id} />
+                {!isSelf && (
+                  <div
+                    className={cn(
+                      "absolute",
+                      side === "top" && "bottom-full left-1/2 mb-1 -translate-x-1/2",
+                      side === "bottom" && !facesVisible && "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2",
+                      side === "bottom" && facesVisible && "bottom-full left-1/2 mb-1 -translate-x-1/2",
+                      side === "left" && !facesVisible && "right-full top-1/2 mr-1 -translate-y-1/2",
+                      side === "right" && !facesVisible && "left-full top-1/2 ml-1 -translate-y-1/2",
+                      (side === "left" || side === "right") && facesVisible && "bottom-full left-1/2 mb-2 -translate-x-1/2",
+                    )}
+                  >
+                    <OpponentHand
+                      playerId={player.id}
+                      nickname={player.nickname}
+                      count={player.cardCount}
+                      cards={facesVisible ? player.hand : null}
+                      orientation={facesVisible || side === "top" || side === "bottom" ? "horizontal" : "vertical"}
+                      toward={side === "bottom" && !facesVisible ? "up" : side === "left" && !facesVisible ? "right" : side === "right" && !facesVisible ? "left" : "down"}
+                      active={player.isCurrent || (showdown !== null && game.roundResult?.callerId === player.id)}
+                      eliminated={seated.eliminated}
+                      readable={facesVisible}
+                      flip={showdown === "reveal" && !reduceMotion}
+                      revealDelay={index * 80}
+                    />
+                  </div>
+                )}
+                <PlayerSeat
+                  player={seated}
+                  isSelf={isSelf}
+                  notice={noticeFor(player.id)}
+                />
+                {!isSelf && <HandValue playerId={player.id} game={game} facesVisible={facesVisible} />}
               </div>
             );
           })}
 
-          <div className="absolute left-1/2 top-1/2 flex max-h-[68%] w-[70%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 overflow-hidden">
-            <div className="flex items-end gap-4">
+          <TableMotion cues={cues} seatOffset={seatOffset} showCall={showdown === null} />
+          <p
+            key={game.currentPlayerId ?? "waiting"}
+            className="turn-chip absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.22em] text-gold sm:hidden"
+            aria-live="polite"
+          >
+            {game.status === "PLAYING"
+              ? game.me?.isCurrent
+                ? "Your turn"
+                : `${turnName}'s turn`
+              : `Round ${game.roundNumber || 1}`}
+          </p>
+          <div className="table-center absolute left-1/2 top-1/2 flex max-h-[78%] w-[88%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 overflow-hidden">
+            <div className="flex items-end gap-3">
               <div className="text-center">
                 <PlayingCard
                   faceDown
@@ -191,29 +427,37 @@ export function GameTable({
                   onSelect={canDrawFromDeck ? () => void drawFromDeck() : undefined}
                 />
                 <p className="mt-1 text-xs text-cream/70">
-                  {canDrawFromDeck ? "Click the deck to draw" : `Draw · ${game.drawPileCount}`}
+                  {canDrawFromDeck
+                    ? hasHover
+                      ? "Click the deck to draw"
+                      : "Tap the deck to draw"
+                    : `Draw · ${game.drawPileCount}`}
                 </p>
               </div>
               {eligibleGroup && eligibleGroup.id !== latestGroup?.id && (
                 <DiscardPile
-                  title={`Take from ${nickname(eligibleGroup.playerId)}`}
+                  title={`Take one from ${nickname(eligibleGroup.playerId)}`}
                   cards={eligibleGroup.cards}
                   selectable={Boolean(game.me?.isCurrent && game.turnPhase === "DRAW")}
                   selectedId={pickupId}
-                  onSelect={setPickupId}
+                  onSelect={takeDiscard}
                 />
               )}
             </div>
             {latestGroup ? (
               <DiscardPile
-                title={`${nickname(latestGroup.playerId)} played`}
+                title={
+                  latestGroup.id === eligibleGroup?.id && game.me?.isCurrent
+                    ? `${nickname(latestGroup.playerId)} played · ${hasHover ? "click" : "tap"} a card`
+                    : `${nickname(latestGroup.playerId)} played`
+                }
                 cards={latestGroup.cards}
                 selectable={
                   latestGroup.id === eligibleGroup?.id &&
                   Boolean(game.me?.isCurrent && game.turnPhase === "DRAW")
                 }
                 selectedId={pickupId}
-                onSelect={setPickupId}
+                onSelect={takeDiscard}
               />
             ) : (
               <p className="text-xs text-cream/70">No cards played yet</p>
@@ -235,24 +479,47 @@ export function GameTable({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap justify-center gap-1.5 pt-1" data-testid="player-hand">
-          {hand.map((card) => (
-            <PlayingCard
-              key={card.id}
-              card={card}
-              selected={selected.includes(card.id)}
-              onSelect={() => {
-                playSound("select");
-                setSelected((current) =>
-                  current.includes(card.id)
-                    ? current.filter((id) => id !== card.id)
-                    : [...current, card.id],
-                );
-              }}
-            />
-          ))}
+        <div
+          className="flex shrink-0 justify-center gap-1.5 overflow-x-auto overscroll-x-contain pt-1 max-sm:flex-nowrap max-sm:justify-start max-sm:snap-x max-sm:px-1 max-sm:pt-6 sm:flex-wrap"
+          data-testid="player-hand"
+        >
+          {facesVisible && game.me && (
+            <p className="sr-only">
+              Your hand value is {game.roundResult?.lines.find((line) => line.playerId === game.me?.id)?.handValue ?? game.me.handValue}.
+            </p>
+          )}
+          {hand.map((card, index) => {
+            const isSelected = selected.includes(card.id);
+            return (
+              <div
+                key={card.id}
+                className="card-deal max-sm:snap-center"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <PlayingCard
+                  card={card}
+                  selected={isSelected}
+                  className={isSelected && !validation.valid ? "card-shake" : undefined}
+                  onSelect={() => {
+                    playSound("select");
+                    setSelected((current) =>
+                      current.includes(card.id)
+                        ? current.filter((id) => id !== card.id)
+                        : [...current, card.id],
+                    );
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
+        {facesVisible && <HandValue playerId={game.me?.id ?? ""} game={game} facesVisible />}
 
+        {actionError && !celebration.phase && (
+          <p className="shrink-0 rounded-2xl border border-[var(--danger)] bg-black/50 px-3 py-2 text-sm text-[var(--danger)]">
+            {actionError}
+          </p>
+        )}
         <ActionBar
           game={game}
           validation={
@@ -262,58 +529,60 @@ export function GameTable({
           }
           selectedCount={selected.length}
           remainingValue={remainingValue}
-          canTake={Boolean(eligibleGroup && pickupId)}
-          onPlay={async () => {
-            playSound("discard");
-            await onAction({ type: "PLAY_CARDS", cardIds: selected });
-          }}
+          onPlay={() => void onAction({ type: "PLAY_CARDS", cardIds: selected })}
           onDraw={drawFromDeck}
-          onTake={async () => {
-            if (!pickupId) {
-              return;
-            }
-            playSound("draw");
-            await onAction({
-              type: "TAKE_FROM_PREVIOUS_DISCARD",
-              cardId: pickupId,
-            });
-          }}
+          onTake={takeDiscardButton}
           onCaramba={() => setConfirmCaramba(true)}
         />
       </div>
 
       <aside className="hidden min-h-0 flex-col gap-2 overflow-y-auto lg:flex">
-        <Scoreboard game={game} />
+        <Scoreboard game={game} deferScores={deferScores} />
         <ChatPanel
           messages={game.chat}
+          roomCode={game.roomCode}
           onSend={(text) => onAction({ type: "CHAT", text })}
         />
       </aside>
 
       {showBoard && (
         <MobileDrawer title="Scores" onClose={() => setShowBoard(false)}>
-          <Scoreboard game={game} />
+          <Scoreboard game={game} deferScores={deferScores} />
         </MobileDrawer>
       )}
       {showChat && (
         <MobileDrawer title="Chat" onClose={() => setShowChat(false)}>
           <ChatPanel
             messages={game.chat}
+            roomCode={game.roomCode}
             onSend={(text) => onAction({ type: "CHAT", text })}
           />
         </MobileDrawer>
       )}
 
-      {game.status === "ROUND_END" && (
+      {showdown === "announce" && game.roundResult && (
+        <CarrambaAnnouncement caller={game.roundResult.callerNickname} reduceMotion={reduceMotion} />
+      )}
+      {showdown && showdown !== "announce" && game.roundResult && (
+        <p className="sr-only" aria-live="polite">
+          {game.roundResult.lines
+            .map((line) => `${line.nickname} has ${line.handValue} in hand.`)
+            .join(" ")}{" "}
+          {showdown === "result" ? showdownAnnouncement(game.roundResult) : ""}
+        </p>
+      )}
+      {showdown === "result" && game.roundResult && game.status !== "GAME_OVER" && (
         <RoundEndOverlay
           game={game}
           secondsLeft={secondsLeft}
           onNext={() => onAction({ type: "NEXT_ROUND" })}
         />
       )}
-      {game.status === "GAME_OVER" && (
-        <GameOverOverlay
+      {celebration.phase && (
+        <WinnerCelebration
           game={game}
+          phase={celebration.phase}
+          reduceMotion={reduceMotion}
           isHost={Boolean(game.me?.isHost)}
           onRematch={() => onAction({ type: "REMATCH" })}
           onLobby={() => onAction({ type: "BACK_TO_LOBBY" })}
@@ -325,13 +594,39 @@ export function GameTable({
           handValue={game.me?.handValue ?? 0}
           onCancel={() => setConfirmCaramba(false)}
           onConfirm={async () => {
-            playSound("caramba");
             setConfirmCaramba(false);
             await onAction({ type: "CALL_CARAMBA" });
           }}
         />
       )}
     </div>
+  );
+}
+
+function HandValue({
+  playerId,
+  game,
+  facesVisible,
+}: {
+  playerId: string;
+  game: PublicGameState;
+  facesVisible: boolean;
+}) {
+  const result = game.roundResult;
+  if (!facesVisible || !result) {
+    return null;
+  }
+  const line = result.lines.find((entry) => entry.playerId === playerId);
+  if (!line) {
+    return null;
+  }
+  const lowest = Math.min(...result.lines.map((entry) => entry.handValue));
+  const isLowest = line.handValue === lowest;
+  return (
+    <p className={cn("text-center text-xs font-extrabold", isLowest ? "text-gold" : "text-cream")}>
+      {line.handValue}
+      {isLowest ? " lowest" : ""}
+    </p>
   );
 }
 
@@ -351,15 +646,25 @@ function DiscardPile({
   return (
     <div className="text-center">
       <div className="flex flex-wrap justify-center gap-1">
-        {cards.map((card) => (
-          <PlayingCard
+        {cards.map((card, index) => (
+          <div
             key={card.id}
-            card={card}
-            eligible={selectable}
-            selected={selectedId === card.id}
-            onSelect={selectable ? () => onSelect(card.id) : undefined}
-            compact
-          />
+            className="origin-bottom"
+            style={{ transform: `rotate(${(index - (cards.length - 1) / 2) * 5}deg)` }}
+          >
+            <PlayingCard
+              card={card}
+              eligible={selectable}
+              selected={selectedId === card.id}
+              label={
+                selectable && selectedId === card.id
+                  ? `${card.rank} of ${card.suit}, tap again to take`
+                  : undefined
+              }
+              onSelect={selectable ? () => onSelect(card.id) : undefined}
+              compact
+            />
+          </div>
         ))}
       </div>
       <p className="mt-1 text-xs text-gold">{title}</p>
@@ -377,8 +682,8 @@ function MobileDrawer({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-40 bg-black/60 p-3 lg:hidden">
-      <div className="pop-panel ml-auto flex h-full max-w-md flex-col rounded-3xl p-4">
+    <div className="fixed inset-0 z-40 flex items-end bg-black/60 lg:hidden">
+      <div className="pop-panel flex max-h-[min(70dvh,32rem)] w-full flex-col rounded-t-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-2xl">{title}</h2>
           <Button variant="ghost" onClick={onClose}>

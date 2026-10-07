@@ -2,7 +2,8 @@ import { cardsByIds, findCard, removeCards } from "./cards";
 import { calculateRoundScores, canCallCaramba } from "./caramba";
 import { createShuffledDeck, dealInitialHands, shuffleDeck } from "./deck";
 import { GAME_RULES } from "./rules";
-import { apply100PointRule, calculateHandScore } from "./scoring";
+import { readScoreRules } from "./score-settings";
+import { applyScoreLimit, calculateHandScore } from "./scoring";
 import {
   chooseStartingPlayer,
   getActivePlayers,
@@ -72,6 +73,12 @@ function replacePlayer(state: GameState, player: PlayerState): GameState {
     ...state,
     players: state.players.map((entry) => (entry.id === player.id ? player : entry)),
   };
+}
+
+export function assertGameMember(state: GameState, playerId: string): void {
+  if (!state.players.some((player) => player.id === playerId)) {
+    throw new GameEngineError("You are not in this game.", "NOT_FOUND");
+  }
 }
 
 function assertPlaying(state: GameState): void {
@@ -235,15 +242,31 @@ export function createInitialGame(input: {
   roomId: string;
   roomCode: string;
   hostPlayerId: string;
-  players: Array<Pick<PlayerState, "id" | "nickname" | "seatIndex" | "connected" | "ready">>;
+  players: Array<
+    Pick<PlayerState, "id" | "nickname" | "seatIndex" | "connected" | "ready"> & {
+      isBot?: boolean;
+      botDifficulty?: PlayerState["botDifficulty"];
+      userId?: string | null;
+    }
+  >;
   randomInt: RandomInt;
+  maxScore?: number;
+  resetScore?: number;
+  mode?: GameState["mode"];
 }): GameState {
+  const rules = readScoreRules({
+    maxScore: input.maxScore,
+    resetScore: input.resetScore,
+  });
   const players: PlayerState[] = input.players.map((player) => ({
     ...player,
     hand: [],
     totalScore: 0,
     lastRoundScore: null,
     eliminated: false,
+    isBot: player.isBot === true,
+    botDifficulty: player.botDifficulty,
+    userId: player.userId ?? null,
   }));
 
   const base: GameState = {
@@ -267,6 +290,11 @@ export function createInitialGame(input: {
     events: [],
     chat: [],
     hostPlayerId: input.hostPlayerId,
+    maxScore: rules.maxScore,
+    resetScore: rules.resetScore,
+    mode: input.mode ?? "private",
+    ratingApplied: false,
+    ratingDeltas: null,
   };
 
   return startRound(base, input.randomInt, { incrementRound: true });
@@ -494,6 +522,7 @@ export function callCaramba(state: GameState, playerId: string): GameState {
   }
 
   const result = calculateRoundScores(state, playerId);
+  const scoreRules = readScoreRules(state);
   let next: GameState = {
     ...state,
     status: "ROUND_END",
@@ -507,7 +536,7 @@ export function callCaramba(state: GameState, playerId: string): GameState {
       if (!line) {
         return player;
       }
-      const applied = apply100PointRule(line.appliedTotal);
+      const applied = applyScoreLimit(line.appliedTotal, scoreRules.maxScore, scoreRules.resetScore);
       return {
         ...player,
         totalScore: applied.score,
@@ -521,7 +550,7 @@ export function callCaramba(state: GameState, playerId: string): GameState {
     ...result,
     lines: result.lines.map((line) => {
       const player = requirePlayer(next, line.playerId);
-      const applied = apply100PointRule(line.appliedTotal);
+      const applied = applyScoreLimit(line.appliedTotal, scoreRules.maxScore, scoreRules.resetScore);
       return {
         ...line,
         appliedTotal: player.totalScore,
@@ -611,6 +640,9 @@ export function rematch(state: GameState, randomInt: RandomInt): GameState {
     hostPlayerId: state.hostPlayerId,
     players: resetPlayers,
     randomInt,
+    maxScore: state.maxScore,
+    resetScore: state.resetScore,
+    mode: state.mode,
   });
 }
 
@@ -620,7 +652,10 @@ export function addChatMessage(
   text: string,
 ): GameState {
   const player = requirePlayer(state, playerId);
-  const trimmed = text.trim();
+  const trimmed = text
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+    .trim()
+    .slice(0, 240);
   if (!trimmed) {
     throw new GameEngineError("Message cannot be empty.", "INVALID_MOVE");
   }
@@ -633,7 +668,7 @@ export function addChatMessage(
         id: nextId("chat"),
         playerId,
         nickname: player.nickname,
-        text: trimmed.slice(0, 240),
+        text: trimmed,
         timestamp: now(),
       },
     ].slice(-80),

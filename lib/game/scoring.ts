@@ -25,22 +25,28 @@ export function calculateHandScore(cards: Card[]): number {
   return cards.reduce((sum, card) => sum + getCardValue(card), 0);
 }
 
+export function applyScoreLimit(
+  score: number,
+  maxScore: number,
+  resetScore: number,
+): {
+  score: number;
+  hitExactHundred: boolean;
+  eliminated: boolean;
+} {
+  if (score === maxScore) {
+    return { score: resetScore, hitExactHundred: true, eliminated: false };
+  }
+  if (score > maxScore) {
+    return { score, hitExactHundred: false, eliminated: true };
+  }
+  return { score, hitExactHundred: false, eliminated: false };
+}
+
 export function apply100PointRule(score: number): {
   score: number;
   hitExactHundred: boolean;
   eliminated: boolean;
 } {
-  if (score === GAME_RULES.ELIMINATION_THRESHOLD) {
-    return {
-      score: GAME_RULES.EXACT_THRESHOLD_RESET,
-      hitExactHundred: true,
-      eliminated: false,
-    };
-  }
-
-  if (score > GAME_RULES.ELIMINATION_THRESHOLD) {
-    return { score, hitExactHundred: false, eliminated: true };
-  }
-
-  return { score, hitExactHundred: false, eliminated: false };
+  return applyScoreLimit(score, GAME_RULES.ELIMINATION_THRESHOLD, GAME_RULES.EXACT_THRESHOLD_RESET);
 }

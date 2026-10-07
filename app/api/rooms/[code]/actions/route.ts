@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { readJson, withApi } from "@/lib/server/api";
+import { privateJson, readJson, withApi } from "@/lib/server/api";
+import { HttpError } from "@/lib/server/errors";
+import { consumeRateLimit } from "@/lib/server/rate-limit";
 import {
   backToLobby,
   caramba,
@@ -14,6 +16,7 @@ import {
   setReady,
   startGame,
   takeDiscard,
+  updateScoreSettings,
 } from "@/lib/server/game-service";
 
 const schema = z.discriminatedUnion("type", [
@@ -34,6 +37,11 @@ const schema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("NEXT_ROUND") }),
   z.object({ type: z.literal("REMATCH") }),
   z.object({ type: z.literal("BACK_TO_LOBBY") }),
+  z.object({
+    type: z.literal("UPDATE_SETTINGS"),
+    maxScore: z.number().int(),
+    resetScore: z.number().int(),
+  }),
 ]);
 
 export async function POST(
@@ -42,36 +50,43 @@ export async function POST(
 ) {
   const { code } = await context.params;
   return withApi(async (incoming, playerId) => {
+    if (!consumeRateLimit(playerId, "action")) {
+      throw new HttpError("Too many actions. Slow down.", 429, "RATE_LIMITED");
+    }
     const action = await readJson(incoming, schema);
     switch (action.type) {
       case "READY":
-        return Response.json(await setReady(code, playerId, true));
+        return privateJson(await setReady(code, playerId, true));
       case "UNREADY":
-        return Response.json(await setReady(code, playerId, false));
+        return privateJson(await setReady(code, playerId, false));
       case "START":
-        return Response.json(await startGame(code, playerId));
+        return privateJson(await startGame(code, playerId));
       case "LEAVE":
-        return Response.json(await leaveRoom(code, playerId));
+        return privateJson(await leaveRoom(code, playerId));
       case "KICK":
-        return Response.json(await kickPlayer(code, playerId, action.playerId));
+        return privateJson(await kickPlayer(code, playerId, action.playerId));
       case "CLOSE":
-        return Response.json(await closeRoom(code, playerId));
+        return privateJson(await closeRoom(code, playerId));
       case "CHAT":
-        return Response.json(await sendChat(code, playerId, action.text));
+        return privateJson(await sendChat(code, playerId, action.text));
       case "PLAY_CARDS":
-        return Response.json(await play(code, playerId, action.cardIds));
+        return privateJson(await play(code, playerId, action.cardIds));
       case "DRAW_FROM_DECK":
-        return Response.json(await draw(code, playerId));
+        return privateJson(await draw(code, playerId));
       case "TAKE_FROM_PREVIOUS_DISCARD":
-        return Response.json(await takeDiscard(code, playerId, action.cardId));
+        return privateJson(await takeDiscard(code, playerId, action.cardId));
       case "CALL_CARAMBA":
-        return Response.json(await caramba(code, playerId));
+        return privateJson(await caramba(code, playerId));
       case "NEXT_ROUND":
-        return Response.json(await nextRound(code, playerId));
+        return privateJson(await nextRound(code, playerId));
       case "REMATCH":
-        return Response.json(await rematch(code, playerId));
+        return privateJson(await rematch(code, playerId));
       case "BACK_TO_LOBBY":
-        return Response.json(await backToLobby(code, playerId));
+        return privateJson(await backToLobby(code, playerId));
+      case "UPDATE_SETTINGS":
+        return privateJson(
+          await updateScoreSettings(code, playerId, action.maxScore, action.resetScore),
+        );
     }
   })(request);
 }

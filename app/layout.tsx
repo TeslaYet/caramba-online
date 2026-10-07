@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { PreferencesProvider } from "@/components/providers/preferences-provider";
+import { SiteChrome } from "@/components/legal/site-chrome";
 import "./globals.css";
 
 const display = Fredoka({
@@ -14,15 +15,24 @@ const sans = Nunito({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://carramba.online"),
   title: "Carramba Online",
   description: "A private multiplayer card game. Keep your hand low. Call Carramba.",
+  openGraph: {
+    title: "Carramba Online",
+    description: "A private multiplayer card game. Keep your hand low. Call Carramba.",
+    images: ["/brand/carramba-logo-v2.webp"],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${display.variable} ${sans.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
-        <PreferencesProvider>{children}</PreferencesProvider>
+        <PreferencesProvider>
+          {children}
+          <SiteChrome />
+        </PreferencesProvider>
       </body>
     </html>
   );

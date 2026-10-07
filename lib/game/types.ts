@@ -28,6 +28,8 @@ export interface Card {
   color: CardColor;
 }
 
+export type GameMode = "private" | "casual" | "ranked" | "practice";
+export type BotDifficulty = "easy" | "normal" | "hard" | "expert";
 export type GameStatus = "LOBBY" | "PLAYING" | "ROUND_END" | "GAME_OVER";
 export type RoomStatus = "LOBBY" | "PLAYING" | "CLOSED";
 export type TurnPhase = "DISCARD" | "DRAW";
@@ -61,6 +63,16 @@ export interface PlayerState {
   eliminated: boolean;
   connected: boolean;
   ready: boolean;
+  isBot?: boolean;
+  botDifficulty?: BotDifficulty;
+  userId?: string | null;
+}
+
+export interface PublicRatingDelta {
+  playerId: string;
+  before: number;
+  after: number;
+  delta: number;
 }
 
 export interface DiscardGroup {
@@ -143,6 +155,11 @@ export interface GameState {
   events: GameLogEvent[];
   chat: ChatMessage[];
   hostPlayerId: string;
+  maxScore: number;
+  resetScore: number;
+  mode: GameMode;
+  ratingApplied: boolean;
+  ratingDeltas: PublicRatingDelta[] | null;
 }
 
 export interface PublicPlayerView {
@@ -190,6 +207,10 @@ export interface PublicGameState {
   events: GameLogEvent[];
   chat: ChatMessage[];
   hostPlayerId: string;
+  maxScore: number;
+  resetScore: number;
+  mode: GameMode;
+  ratingDeltas: PublicRatingDelta[] | null;
 }
 
 export interface RoomRecord {
@@ -198,6 +219,9 @@ export interface RoomRecord {
   hostPlayerId: string;
   status: RoomStatus;
   maxPlayers: number;
+  maxScore: number;
+  resetScore: number;
+  mode: GameMode;
   gameId: string | null;
   createdAt: number;
   updatedAt: number;

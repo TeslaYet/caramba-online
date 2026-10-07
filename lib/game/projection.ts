@@ -1,3 +1,4 @@
+import { readScoreRules } from "./score-settings";
 import { calculateHandScore } from "./scoring";
 import type { GameState, PublicGameState, PublicPlayerView } from "./types";
 import { getPreviousActivePlayer } from "./turn-manager";
@@ -78,11 +79,18 @@ export function getPublicGameStateForPlayer(
           isCurrent: me.id === gameState.currentPlayerId,
         }
       : null,
-    roundResult: gameState.roundResult,
+    roundResult: revealHands ? gameState.roundResult : null,
     nextRoundAt: gameState.nextRoundAt,
-    events: gameState.events,
+    events: gameState.events.map((event) => ({
+      ...event,
+      payload: sanitizeEventPayload(event.type, event.payload),
+    })),
     chat: gameState.chat,
     hostPlayerId: gameState.hostPlayerId,
+    maxScore: readScoreRules(gameState).maxScore,
+    resetScore: readScoreRules(gameState).resetScore,
+    mode: gameState.mode ?? "private",
+    ratingDeltas: gameState.status === "GAME_OVER" ? (gameState.ratingDeltas ?? null) : null,
   };
 }
 

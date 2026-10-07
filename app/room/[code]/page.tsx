@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { GameTable } from "@/components/game/game-table";
 import { RoomLobby } from "@/components/lobby/room-lobby";
 import { useRoom } from "@/lib/realtime/use-room";
@@ -22,6 +23,7 @@ export default function RoomPage() {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 text-center">
         <div>
+          <BrandMark className="mx-auto mb-4" />
           <h1 className="font-display text-4xl">Room unavailable</h1>
           <p className="mt-2 text-cream/70">{error}</p>
         </div>
@@ -31,7 +33,8 @@ export default function RoomPage() {
 
   if (!snapshot) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3">
+        <BrandMark />
         Loading table…
       </main>
     );
@@ -51,6 +54,7 @@ export default function RoomPage() {
           await act({ type: "LEAVE" }).catch(() => null);
           router.push("/");
         }}
+        actionError={actionError}
       />
     );
   }
