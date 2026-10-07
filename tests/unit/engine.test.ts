@@ -313,3 +313,24 @@ describe("projection", () => {
     expect(calculateHandScore(view.players[1]?.hand ?? [])).toBe(9);
   });
 });
+
+describe("table sizes", () => {
+  it("deals a fresh 104-card deck to 2, 4, 6, and 8 players", () => {
+    for (const count of [2, 4, 6, 8]) {
+      const game = makeGame(
+        Array.from({ length: count }, (_, index) => `P${index + 1}`),
+        rng(count),
+      );
+      const ids = game.players.flatMap((player) => player.hand.map((item) => item.id));
+      ids.push(...game.drawPile.map((item) => item.id));
+      expect(game.players).toHaveLength(count);
+      expect(game.players.every((player) => player.hand.length === 5)).toBe(true);
+      expect(new Set(ids).size).toBe(104);
+      expect(ids).toHaveLength(104);
+      expect(game.currentPlayerId).toBeTruthy();
+      const view = getPublicGameStateForPlayer(game, game.players[0]!.id);
+      expect(view.players.filter((player) => player.hand === null)).toHaveLength(count - 1);
+      expect(view.players.every((player) => player.cardCount === 5)).toBe(true);
+    }
+  });
+});

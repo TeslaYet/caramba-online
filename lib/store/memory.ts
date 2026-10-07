@@ -37,6 +37,19 @@ export class MemoryStore implements Store {
     this.db.rooms.set(room.id, room);
   }
 
+  async markRoomPlaying(roomId: string, gameId: string): Promise<void> {
+    const current = this.db.rooms.get(roomId);
+    if (!current || current.status !== "LOBBY") {
+      throw new StaleVersionError();
+    }
+    this.db.rooms.set(roomId, {
+      ...current,
+      status: "PLAYING",
+      gameId,
+      updatedAt: Date.now(),
+    });
+  }
+
   async listPlayers(roomId: string): Promise<RoomPlayer[]> {
     return [...this.db.players.values()]
       .filter((player) => player.roomId === roomId)

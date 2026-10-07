@@ -1,6 +1,8 @@
 # Carramba Online security audit
 
-Audit date: 5 October 2026. The live site is https://www.carramba.online. This pass hardens the current anonymous multiplayer game. It does not add accounts, rankings, tournaments, ads, or email verification.
+Audit date: 5 October 2026. Later product work (accounts, rankings, consent, inactive ads and billing) is described in `docs/legal-compliance-audit.md` and `docs/legal-launch-readiness.md`. This file is the 5 October hardening note, not a description of everything the app does now.
+
+The live site is https://www.carramba.online. This pass hardens the anonymous multiplayer game.
 
 ## Executive summary
 

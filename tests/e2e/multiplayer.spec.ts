@@ -96,6 +96,13 @@ test("friends can play a realtime Carramba match", async ({ browser }) => {
   await expect(host.getByLabel("9 of hearts")).toBeVisible();
   await expect(guest.getByLabel("9 of hearts")).toHaveCount(0);
 
+  if (await guest.getByRole("heading", { name: "Your turn" }).isVisible()) {
+    await guest.getByLabel("4 of clubs").click();
+    await guest.getByTestId("play-button").click();
+    await guest.getByTestId("draw-button").click();
+  }
+  await expect(host.getByRole("heading", { name: "Your turn" })).toBeVisible();
+
   for (const label of [
     "9 of hearts",
     "10 of diamonds",
@@ -136,7 +143,7 @@ test("friends can play a realtime Carramba match", async ({ browser }) => {
 
   await host.reload();
   await expect(host.getByTestId("player-hand").getByLabel(/of /)).toHaveCount(5);
-  await expect(host.getByRole("cell", { name: "Hugo" })).toBeVisible();
+  await expect(host.getByRole("region", { name: "Scoreboard" })).toContainText("Hugo");
 
   await hostContext.close();
   await guestContext.close();

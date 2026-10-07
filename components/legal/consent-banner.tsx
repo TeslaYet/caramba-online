@@ -55,7 +55,7 @@ export function ConsentBanner() {
     <div
       role="dialog"
       aria-labelledby="consent-title"
-      className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-xl rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-4 shadow-xl"
+      className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-xl rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-4 shadow-xl [@media(max-height:520px)]:p-3"
     >
       <h2 id="consent-title" className="font-display text-2xl">
         Cookies

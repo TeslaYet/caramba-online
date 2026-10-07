@@ -36,6 +36,25 @@ export class SupabaseStore implements Store {
     }
   }
 
+  async markRoomPlaying(roomId: string, gameId: string): Promise<void> {
+    const { data, error } = await this.client
+      .from("rooms")
+      .update({
+        status: "PLAYING",
+        game_id: gameId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", roomId)
+      .eq("status", "LOBBY")
+      .select("id");
+    if (error) {
+      throw error;
+    }
+    if (!data?.length) {
+      throw new StaleVersionError();
+    }
+  }
+
   async listPlayers(roomId: string): Promise<RoomPlayer[]> {
     const { data, error } = await this.client
       .from("players")
@@ -98,21 +117,7 @@ export class SupabaseStore implements Store {
   }
 
   async saveGame(game: GameState, expectedVersion?: number): Promise<void> {
-    if (expectedVersion !== undefined) {
-      const { data, error } = await this.client
-        .from("games")
-        .select("version")
-        .eq("id", game.id)
-        .maybeSingle();
-      if (error) {
-        throw error;
-      }
-      if (data && data.version !== expectedVersion) {
-        throw new StaleVersionError();
-      }
-    }
-
-    const { error } = await this.client.from("games").upsert({
+    const row = {
       id: game.id,
       room_id: game.roomId,
       status: game.status,
@@ -121,9 +126,26 @@ export class SupabaseStore implements Store {
       state: game,
       version: game.version,
       updated_at: new Date().toISOString(),
-    });
-    if (error) {
-      throw error;
+    };
+
+    if (expectedVersion === undefined) {
+      const { error } = await this.client.from("games").upsert(row);
+      if (error) {
+        throw error;
+      }
+    } else {
+      const { data, error } = await this.client
+        .from("games")
+        .update(row)
+        .eq("id", game.id)
+        .eq("version", expectedVersion)
+        .select("id");
+      if (error) {
+        throw error;
+      }
+      if (!data?.length) {
+        throw new StaleVersionError();
+      }
     }
 
     const lastEvent = game.events.at(-1);

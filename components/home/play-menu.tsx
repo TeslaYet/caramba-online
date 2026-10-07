@@ -30,7 +30,7 @@ export function PlayMenu() {
   }, []);
 
   return (
-    <main className="safe-screen mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center overflow-y-auto py-8 text-center">
+    <main className="safe-screen mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center overflow-y-auto py-8 text-center [@media(max-height:520px)]:justify-start [@media(max-height:520px)]:pb-44 [@media(max-height:520px)]:pt-4">
       <h1>
         <BrandMark size="hero" />
       </h1>

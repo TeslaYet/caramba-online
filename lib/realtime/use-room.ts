@@ -58,6 +58,9 @@ export function useRoom(code: string) {
         });
         const data = await response.json();
         if (!response.ok) {
+          if (response.status === 409) {
+            await load();
+          }
           const message = data.error ?? "That action could not be completed.";
           setActionError(message);
           throw new Error(message);
@@ -73,7 +76,7 @@ export function useRoom(code: string) {
         setBusy(false);
       }
     },
-    [code, snapshot],
+    [code, snapshot, load],
   );
 
   return useMemo(

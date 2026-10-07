@@ -151,17 +151,31 @@ export async function joinRoom(playerId: string, nickname: string, rawCode: stri
       throw new HttpError("This room is full.", 409, "ROOM_FULL");
     }
 
+    const takenSeats = new Set(players.map((entry) => entry.seatIndex));
+    let seatIndex = 0;
+    while (takenSeats.has(seatIndex)) {
+      seatIndex += 1;
+    }
     const player: RoomPlayer = {
       id: playerId,
       roomId: room.id,
       nickname: name,
-      seatIndex: players.length,
+      seatIndex,
       connected: true,
       ready: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    await store().savePlayer(player);
+    try {
+      await store().savePlayer(player);
+    } catch (error) {
+      const code =
+        error && typeof error === "object" && "code" in error ? String(error.code) : "";
+      if (code === "23505") {
+        throw new HttpError("That seat was just taken. Join again.", 409, "SEAT_TAKEN");
+      }
+      throw error;
+    }
     await publishRoom(code);
     return { room, player, game: null };
   });
@@ -251,13 +265,8 @@ export async function startGame(code: string, playerId: string) {
     };
     game = playBotTurns(game, secureRandomInt);
 
-    await store().saveRoom({
-      ...room,
-      status: "PLAYING",
-      gameId: game.id,
-      updatedAt: Date.now(),
-    });
     await store().saveGame(game);
+    await store().markRoomPlaying(room.id, game.id);
     await publishRoom(room.code);
     return getPublicGameStateForPlayer(game, playerId);
   });
@@ -629,8 +638,8 @@ export async function createPracticeGame(
     })),
   });
   game = playBotTurns(game, secureRandomInt);
-  await store().saveRoom({ ...room, gameId: game.id, updatedAt: Date.now() });
   await store().saveGame(game);
+  await store().saveRoom({ ...room, gameId: game.id, updatedAt: Date.now() });
   await publishRoom(room.code);
   return { code: room.code, game: getPublicGameStateForPlayer(game, playerId) };
 }
@@ -689,8 +698,8 @@ export async function createMatchedRoom(entries: QueueEntry[]) {
       userId: entry.userId,
     })),
   });
-  await store().saveRoom({ ...room, gameId: game.id });
   await store().saveGame(game);
+  await store().saveRoom({ ...room, gameId: game.id, updatedAt: Date.now() });
   await publishRoom(room.code);
   return room.code;
 }

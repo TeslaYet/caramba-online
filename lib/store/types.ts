@@ -14,6 +14,8 @@ export interface RoomPlayer {
 export interface Store {
   getRoomByCode(code: string): Promise<RoomRecord | null>;
   saveRoom(room: RoomRecord): Promise<void>;
+  /** One start wins when several servers try to leave the lobby at once. */
+  markRoomPlaying(roomId: string, gameId: string): Promise<void>;
   listPlayers(roomId: string): Promise<RoomPlayer[]>;
   savePlayer(player: RoomPlayer): Promise<void>;
   removePlayer(playerId: string): Promise<void>;
