@@ -1,4 +1,4 @@
-import { claimMatch, joinQueue, leaveQueue, pruneQueue, touchQueue, type QueueEntry, type QueueMode } from "@/lib/game/matchmaking";
+import { claimMatch, claimSolo, joinQueue, leaveQueue, pruneQueue, touchQueue, type QueueEntry, type QueueMode } from "@/lib/game/matchmaking";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 const memory: QueueEntry[] = [];
@@ -180,6 +180,54 @@ export async function takeMatch(mode: QueueMode): Promise<QueueEntry[] | null> {
         claimed.map((entry) => entry.id),
       );
     }
+    return null;
+  }
+  return claimed;
+}
+
+export async function takeSolo(mode: QueueMode): Promise<QueueEntry | null> {
+  if (mode !== "casual") {
+    return null;
+  }
+  if (!isSupabaseConfigured()) {
+    const pruned = pruneQueue(memory, Date.now());
+    const decision = claimSolo(pruned, mode, Date.now());
+    memory.splice(0, memory.length, ...(decision?.rest ?? pruned));
+    return decision?.solo ?? null;
+  }
+
+  const client = createAdminClient();
+  await dropStale();
+  const { data, error } = await client
+    .from("match_queue")
+    .select("*")
+    .eq("mode", mode)
+    .eq("status", "waiting")
+    .order("joined_at", { ascending: true })
+    .limit(2);
+  if (error) {
+    throw error;
+  }
+  const waiting = (data ?? []).map((row) => rowToEntry(row));
+  const decision = claimSolo(waiting, mode, Date.now());
+  if (!decision) {
+    return null;
+  }
+  const updated = await client
+    .from("match_queue")
+    .update({ status: "matched" })
+    .eq("id", decision.solo.id)
+    .eq("status", "waiting")
+    .select("*");
+  if (updated.error) {
+    throw updated.error;
+  }
+  const claimed = (updated.data ?? []).map((row) => rowToEntry(row))[0];
+  if (!claimed) {
+    return null;
+  }
+  if ((await waitingCount(mode)) > 0) {
+    await client.from("match_queue").update({ status: "waiting" }).eq("id", claimed.id);
     return null;
   }
   return claimed;

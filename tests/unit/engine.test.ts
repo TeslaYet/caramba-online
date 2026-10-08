@@ -13,6 +13,7 @@ import { calculateHandScore } from "@/lib/game/scoring";
 import { getNextActivePlayer } from "@/lib/game/turn-manager";
 import { validateDiscard } from "@/lib/game/validators";
 import { card, makeGame, redSequence9ToK, rng } from "./helpers";
+import type { Card } from "@/lib/game/types";
 
 describe("full-hand discard", () => {
   it("allows discarding a 5-card sequence then drawing back to 1", () => {
@@ -331,6 +332,162 @@ describe("table sizes", () => {
       const view = getPublicGameStateForPlayer(game, game.players[0]!.id);
       expect(view.players.filter((player) => player.hand === null)).toHaveLength(count - 1);
       expect(view.players.every((player) => player.cardCount === 5)).toBe(true);
+    }
+  });
+});
+
+describe("exact discard pickup", () => {
+  function hearts(length: number) {
+    const ranks = ["3", "4", "5", "6", "7", "8", "9"] as const;
+    return Array.from({ length }, (_, index) => card("hearts", ranks[index]!, 1, 900 + index));
+  }
+
+  function ready(group: Card[], older: Card[] = [], players = 2) {
+    const names = Array.from({ length: players }, (_, index) => `P${index + 1}`);
+    const previousId = `player-${players}`;
+    let game = arrangeTestHands(makeGame(names), {
+      "player-1": [card("clubs", "9", 2, 880)],
+    });
+    const removed = new Set([...group, ...older].map((item) => item.id));
+    game = {
+      ...game,
+      currentPlayerId: "player-1",
+      turnPhase: "DRAW",
+      players: game.players.map((player) => ({
+        ...player,
+        hand: player.hand.filter((item) => !removed.has(item.id)),
+      })),
+      drawPile: game.drawPile.filter((item) => !removed.has(item.id)),
+      discardHistory: [
+        ...(older.length
+          ? [
+              {
+                id: "older-group",
+                playerId: previousId,
+                cards: older,
+                turnNumber: 1,
+                timestamp: 1,
+                pickupEligible: false,
+              },
+            ]
+          : []),
+        {
+          id: "latest-group",
+          playerId: previousId,
+          cards: group,
+          turnNumber: 2,
+          timestamp: 2,
+          pickupEligible: true,
+        },
+      ],
+    };
+    return game;
+  }
+
+  function expectExact(group: Card[], index: number) {
+    const chosen = group[index]!;
+    const game = ready(group);
+    const taken = takePreviousDiscard(game, "player-1", chosen.id);
+    const hand = taken.players[0]?.hand ?? [];
+    const left = taken.discardHistory.find((entry) => entry.id === "latest-group")?.cards ?? [];
+    expect(hand.map((item) => item.id)).toContain(chosen.id);
+    expect(left.map((item) => item.id)).not.toContain(chosen.id);
+    expect(left.map((item) => item.id)).toEqual(
+      group.filter((item) => item.id !== chosen.id).map((item) => item.id),
+    );
+    expect(hand.filter((item) => group.some((card) => card.id === item.id))).toEqual([chosen]);
+    expect(taken.events.at(-1)?.payload.cardId).toBe(chosen.id);
+  }
+
+  it("takes the only card in a one-card discard", () => {
+    expectExact(hearts(1), 0);
+  });
+
+  it("takes either card from a two-card discard", () => {
+    const group = [card("spades", "8", 1, 910), card("spades", "8", 2, 911)];
+    expectExact(group, 0);
+    expectExact(group, 1);
+  });
+
+  it("takes the first, middle, or last card of a three-card discard", () => {
+    const group = hearts(3);
+    expectExact(group, 0);
+    expectExact(group, 1);
+    expectExact(group, 2);
+  });
+
+  it("takes either end of a four-card discard", () => {
+    const group = hearts(4);
+    expectExact(group, 0);
+    expectExact(group, 3);
+  });
+
+  it("takes the first, middle, or last card of a five-card discard", () => {
+    const group = hearts(5);
+    expectExact(group, 0);
+    expectExact(group, 2);
+    expectExact(group, 4);
+  });
+
+  it("moves the chosen copy when both decks contain the same rank and suit", () => {
+    const visible = card("hearts", "5", 1, 920);
+    const hidden = card("hearts", "5", 2, 921);
+    const game = ready([visible, card("hearts", "6", 1, 922), card("hearts", "7", 1, 923)]);
+    game.drawPile = [hidden, ...game.drawPile.filter((item) => item.id !== hidden.id)];
+    const taken = takePreviousDiscard(game, "player-1", visible.id);
+    expect(taken.players[0]?.hand.some((item) => item.id === visible.id)).toBe(true);
+    expect(taken.players[0]?.hand.some((item) => item.id === hidden.id)).toBe(false);
+    expect(taken.drawPile.some((item) => item.id === hidden.id)).toBe(true);
+  });
+
+  it("rejects a card that is not in the current eligible group", () => {
+    const group = hearts(3);
+    const older = [card("diamonds", "2", 2, 930)];
+    const game = ready(group, older);
+    expect(() => takePreviousDiscard(game, "player-1", older[0]!.id)).toThrow(GameEngineError);
+    expect(() => takePreviousDiscard(game, "player-1", "deck2-clubs-9-880")).toThrow(GameEngineError);
+    expect(() => takePreviousDiscard(game, "player-1", "")).toThrow(GameEngineError);
+    expect(() => takePreviousDiscard(game, "player-9", group[1]!.id)).toThrow(/not found/i);
+    expect(() => takePreviousDiscard(game, "player-2", group[1]!.id)).toThrow(/not your turn/i);
+    const once = takePreviousDiscard(game, "player-1", group[1]!.id);
+    expect(() => takePreviousDiscard(once, "player-1", group[0]!.id)).toThrow(GameEngineError);
+    expect(() =>
+      takePreviousDiscard({ ...game, turnPhase: "DISCARD" }, "player-1", group[0]!.id),
+    ).toThrow(/before taking/i);
+  });
+
+  it("offers only the previous player's latest group at 2, 4, and 8 players", () => {
+    for (const count of [2, 4, 8]) {
+      const group = hearts(3);
+      const game = ready(group, [], count);
+      const previousId = `player-${count}`;
+      if (count > 2) {
+        const decoy = [card("clubs", "A", 2, 940 + count)];
+        game.drawPile = game.drawPile.filter((item) => item.id !== decoy[0]!.id);
+        game.players = game.players.map((player) => ({
+          ...player,
+          hand: player.hand.filter((item) => item.id !== decoy[0]!.id),
+        }));
+        game.discardHistory = [
+          {
+            id: "stranger",
+            playerId: "player-2",
+            cards: decoy,
+            turnNumber: 1,
+            timestamp: 1,
+            pickupEligible: false,
+          },
+          ...game.discardHistory,
+        ];
+        expect(() => takePreviousDiscard(game, "player-1", decoy[0]!.id)).toThrow(GameEngineError);
+      }
+      const view = getPublicGameStateForPlayer(game, "player-1");
+      expect(view.eligibleDiscardGroupId).toBe("latest-group");
+      expect(game.discardHistory.find((entry) => entry.id === "latest-group")?.playerId).toBe(
+        previousId,
+      );
+      const taken = takePreviousDiscard(game, "player-1", group[1]!.id);
+      expect(taken.players[0]?.hand.some((item) => item.id === group[1]!.id)).toBe(true);
     }
   });
 });

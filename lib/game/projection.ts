@@ -1,23 +1,13 @@
+import { getEligibleDiscardGroup } from "./game-engine";
 import { readScoreRules } from "./score-settings";
 import { calculateHandScore } from "./scoring";
 import type { GameState, PublicGameState, PublicPlayerView } from "./types";
-import { getPreviousActivePlayer } from "./turn-manager";
 
 function eligibleDiscardGroupId(state: GameState): string | null {
   if (state.status !== "PLAYING") {
     return null;
   }
-  if (state.turnPhase !== "DRAW" || !state.currentPlayerId) {
-    return null;
-  }
-  const previous = getPreviousActivePlayer(state, state.currentPlayerId);
-  if (!previous) {
-    return null;
-  }
-  const group = [...state.discardHistory]
-    .reverse()
-    .find((entry) => entry.playerId === previous.id);
-  return group?.id ?? null;
+  return getEligibleDiscardGroup(state)?.id ?? null;
 }
 
 export function getPublicGameStateForPlayer(

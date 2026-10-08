@@ -70,7 +70,13 @@ export function QueueScreen({ mode }: { mode: "casual" | "ranked" }) {
       <p className="mt-3 text-cream/75">
         {matched ? "Entering game..." : `Players found: ${playersFound}`}
       </p>
-      {!matched && <p className="mt-1 text-sm text-cream/60">Waiting for more players...</p>}
+      {!matched && (
+        <p className="mt-1 text-sm text-cream/60">
+          {ranked || playersFound > 1
+            ? "Waiting for more players..."
+            : "If you are still alone after a minute, a bot joins for a 1v1."}
+        </p>
+      )}
       <p className="mt-4 text-sm text-cream/70">
         {ranked
           ? "This game changes your rating and appears on the rankings."

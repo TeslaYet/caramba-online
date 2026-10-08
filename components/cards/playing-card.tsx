@@ -46,11 +46,14 @@ export function PlayingCard({
   disabled = false,
   faceDown = false,
   eligible = false,
+  pending = false,
   compact = false,
   mini = false,
   decorative = false,
+  accent = "lime",
   label,
   className,
+  testId,
   onSelect,
 }: {
   card?: Card;
@@ -58,27 +61,31 @@ export function PlayingCard({
   disabled?: boolean;
   faceDown?: boolean;
   eligible?: boolean;
+  pending?: boolean;
   compact?: boolean;
   mini?: boolean;
   decorative?: boolean;
+  accent?: "lime" | "gold";
   label?: string;
   className?: string;
+  testId?: string;
   onSelect?: () => void;
 }) {
   const red = card?.color === "red";
   const accessibleLabel = label ?? (card ? `${card.rank} of ${card.suit}` : "Face-down card");
   const classes = cn(
     mini ? "card-shadow-mini rounded-[10px]" : "card-shadow rounded-[14px]",
-    "focus-ring relative shrink-0 touch-manipulation overflow-hidden border text-left transition-transform",
+    "focus-ring relative shrink-0 touch-manipulation overflow-hidden border text-left transition-transform duration-75",
     mini ? "h-12 w-8" : compact ? "h-20 w-14 sm:h-16 sm:w-11" : "h-24 w-[4.25rem]",
     className,
     faceDown || !card
       ? "border-white/70 bg-[linear-gradient(145deg,var(--serape),#f08a2a_45%,var(--accent))]"
       : "border-white bg-[#fffdf8]",
-    selected && "-translate-y-4 ring-4 ring-[var(--gold)]",
-    eligible && "ring-4 ring-[var(--lime)]",
-    onSelect && !disabled && "card-hover",
-    disabled && !decorative && "opacity-70",
+    selected && "-translate-y-3 ring-4 ring-[var(--gold)]",
+    eligible && accent === "gold" && "ring-2 ring-[var(--gold)]",
+    eligible && accent !== "gold" && "ring-4 ring-[var(--lime)]",
+    onSelect && !disabled && "card-hover active:translate-y-1 active:ring-4 active:ring-[var(--gold)]",
+    disabled && !pending && !decorative && "opacity-70",
   );
   const face =
     faceDown || !card ? (
@@ -114,9 +121,11 @@ export function PlayingCard({
     <button
       type="button"
       disabled={disabled || !onSelect}
+      aria-busy={pending}
       onClick={onSelect}
       aria-pressed={selected}
       aria-label={accessibleLabel}
+      data-testid={testId}
       className={classes}
     >
       {face}

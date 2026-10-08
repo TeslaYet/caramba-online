@@ -31,7 +31,7 @@ const schema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("DRAW_FROM_DECK") }),
   z.object({
     type: z.literal("TAKE_FROM_PREVIOUS_DISCARD"),
-    cardId: z.string(),
+    cardId: z.string().min(1),
   }),
   z.object({ type: z.literal("CALL_CARAMBA") }),
   z.object({ type: z.literal("NEXT_ROUND") }),

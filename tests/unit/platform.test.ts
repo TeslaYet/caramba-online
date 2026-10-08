@@ -4,7 +4,7 @@ import { canShowAds } from "@/lib/ui/entitlements";
 import { rankTitle, winRate } from "@/lib/ui/ranks";
 import { unreadCount } from "@/lib/ui/chat-notice";
 import { canPlayAudio } from "@/lib/ui/audio";
-import { claimMatch, joinQueue, leaveQueue, type QueueEntry } from "@/lib/game/matchmaking";
+import { claimMatch, claimSolo, joinQueue, leaveQueue, QUEUE_SOLO_MATCH_MS, type QueueEntry } from "@/lib/game/matchmaking";
 
 function entry(userId: string, at: number, mode: QueueEntry["mode"] = "casual"): QueueEntry {
   return {
@@ -52,6 +52,14 @@ describe("matchmaking queue", () => {
   it("does not mix casual and ranked players", () => {
     const queued = [entry("a", 0, "casual"), entry("b", 0, "ranked")];
     expect(claimMatch(queued, "ranked", 20_000)).toBeNull();
+  });
+
+  it("starts a casual 1v1 with a bot after one player waits a minute", () => {
+    const queued = [entry("a", 0)];
+    expect(claimSolo(queued, "casual", QUEUE_SOLO_MATCH_MS - 1)).toBeNull();
+    expect(claimSolo(queued, "ranked", QUEUE_SOLO_MATCH_MS + 1)).toBeNull();
+    expect(claimSolo([entry("a", 0), entry("b", 1000)], "casual", QUEUE_SOLO_MATCH_MS + 1)).toBeNull();
+    expect(claimSolo(queued, "casual", QUEUE_SOLO_MATCH_MS)?.solo.userId).toBe("a");
   });
 });
 

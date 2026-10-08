@@ -459,6 +459,9 @@ export function takePreviousDiscard(
       "NO_PICKUP",
     );
   }
+  if (!cardId) {
+    throw new GameEngineError("Choose a card from the previous discard.", "NO_PICKUP");
+  }
   const card = findCard(group.cards, cardId);
   if (!card) {
     throw new GameEngineError(
@@ -479,6 +482,7 @@ export function takePreviousDiscard(
   next = replacePlayer(next, { ...player, hand: [...player.hand, card] });
   next = appendEvent(next, "PLAYER_TOOK_DISCARD", playerId, {
     fromPlayerId: group.playerId,
+    cardId: card.id,
   });
   return finishTurn(next, playerId);
 }

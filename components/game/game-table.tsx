@@ -61,7 +61,9 @@ export function GameTable({
   const deferScores = showdown !== null && showdown !== "result";
   const cues = useTableCues(game);
   const [selected, setSelected] = useState<string[]>([]);
-  const [pickupId, setPickupId] = useState<string | null>(null);
+  const [choosingDiscard, setChoosingDiscard] = useState(false);
+  const [pendingTakeId, setPendingTakeId] = useState<string | null>(null);
+  const pendingTake = useRef<string | null>(null);
   const [selectionEpoch, setSelectionEpoch] = useState(
     `${game.currentPlayerId}:${game.turnPhase}:${game.roundNumber}`,
   );
@@ -70,8 +72,13 @@ export function GameTable({
   ) {
     setSelectionEpoch(`${game.currentPlayerId}:${game.turnPhase}:${game.roundNumber}`);
     setSelected([]);
-    setPickupId(null);
+    setChoosingDiscard(false);
+    setPendingTakeId(null);
   }
+  const turnKey = `${game.currentPlayerId}:${game.turnPhase}:${game.roundNumber}`;
+  useEffect(() => {
+    pendingTake.current = null;
+  }, [turnKey]);
   const [confirmCaramba, setConfirmCaramba] = useState(false);
   const [showBoard, setShowBoard] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -123,37 +130,54 @@ export function GameTable({
     }));
   }, [game.players, me?.id]);
 
-  const canDrawFromDeck =
+  const canDrawOrTake =
     game.status === "PLAYING" && game.turnPhase === "DRAW" && Boolean(game.me?.isCurrent);
 
   async function drawFromDeck() {
-    if (!canDrawFromDeck) {
+    if (pendingTake.current || !canDrawOrTake) {
       return;
     }
-    await onAction({ type: "DRAW_FROM_DECK" });
+    pendingTake.current = "deck";
+    setPendingTakeId("deck");
+    try {
+      await onAction({ type: "DRAW_FROM_DECK" });
+    } finally {
+      if (pendingTake.current === "deck") {
+        pendingTake.current = null;
+        setPendingTakeId(null);
+      }
+    }
   }
 
   function submitTake(cardId: string) {
-    void onAction({ type: "TAKE_FROM_PREVIOUS_DISCARD", cardId });
-  }
-
-  function takeDiscard(cardId: string) {
-    if (pickupId !== cardId) {
-      setPickupId(cardId);
+    if (pendingTake.current || !canDrawOrTake) {
       return;
     }
-    setPickupId(null);
-    submitTake(cardId);
+    const group = game.discardGroups.find((entry) => entry.id === game.eligibleDiscardGroupId);
+    if (!group?.cards.some((card) => card.id === cardId)) {
+      return;
+    }
+    pendingTake.current = cardId;
+    setPendingTakeId(cardId);
+    setChoosingDiscard(false);
+    void onAction({ type: "TAKE_FROM_PREVIOUS_DISCARD", cardId }).finally(() => {
+      if (pendingTake.current === cardId) {
+        pendingTake.current = null;
+        setPendingTakeId(null);
+      }
+    });
   }
 
   function takeDiscardButton() {
     const group = game.discardGroups.find((entry) => entry.id === game.eligibleDiscardGroupId);
-    const card = group?.cards[0];
-    if (!card) {
+    const cards = group?.cards ?? [];
+    if (cards.length === 1 && cards[0]) {
+      submitTake(cards[0].id);
       return;
     }
-    setPickupId(null);
-    submitTake(card.id);
+    if (cards.length > 1) {
+      setChoosingDiscard(true);
+    }
   }
 
   function seatOffset(playerId: string) {
@@ -418,16 +442,18 @@ export function GameTable({
               <div className="text-center">
                 <PlayingCard
                   faceDown
-                  eligible={canDrawFromDeck}
+                  eligible={canDrawOrTake}
                   label={
-                    canDrawFromDeck
+                    canDrawOrTake
                       ? `Draw from deck, ${game.drawPileCount} cards left`
                       : `Draw pile, ${game.drawPileCount} cards`
                   }
-                  onSelect={canDrawFromDeck ? () => void drawFromDeck() : undefined}
+                  onSelect={
+                    canDrawOrTake && pendingTakeId === null ? () => void drawFromDeck() : undefined
+                  }
                 />
                 <p className="mt-1 text-xs text-cream/70">
-                  {canDrawFromDeck
+                  {canDrawOrTake
                     ? hasHover
                       ? "Click the deck to draw"
                       : "Tap the deck to draw"
@@ -438,26 +464,25 @@ export function GameTable({
                 <DiscardPile
                   title={`Take one from ${nickname(eligibleGroup.playerId)}`}
                   cards={eligibleGroup.cards}
-                  selectable={Boolean(game.me?.isCurrent && game.turnPhase === "DRAW")}
-                  selectedId={pickupId}
-                  onSelect={takeDiscard}
+                  selectable={canDrawOrTake}
+                  emphasized={choosingDiscard}
+                  pendingId={pendingTakeId}
+                  onSelect={submitTake}
                 />
               )}
             </div>
             {latestGroup ? (
               <DiscardPile
                 title={
-                  latestGroup.id === eligibleGroup?.id && game.me?.isCurrent
-                    ? `${nickname(latestGroup.playerId)} played · ${hasHover ? "click" : "tap"} a card`
+                  latestGroup.id === eligibleGroup?.id && canDrawOrTake
+                    ? `Take one · ${hasHover ? "click" : "tap"} a card`
                     : `${nickname(latestGroup.playerId)} played`
                 }
                 cards={latestGroup.cards}
-                selectable={
-                  latestGroup.id === eligibleGroup?.id &&
-                  Boolean(game.me?.isCurrent && game.turnPhase === "DRAW")
-                }
-                selectedId={pickupId}
-                onSelect={takeDiscard}
+                selectable={latestGroup.id === eligibleGroup?.id && canDrawOrTake}
+                emphasized={choosingDiscard && latestGroup.id === eligibleGroup?.id}
+                pendingId={pendingTakeId}
+                onSelect={submitTake}
               />
             ) : (
               <p className="text-xs text-cream/70">No cards played yet</p>
@@ -488,14 +513,10 @@ export function GameTable({
               Your hand value is {game.roundResult?.lines.find((line) => line.playerId === game.me?.id)?.handValue ?? game.me.handValue}.
             </p>
           )}
-          {hand.map((card, index) => {
+          {hand.map((card) => {
             const isSelected = selected.includes(card.id);
             return (
-              <div
-                key={card.id}
-                className="card-deal max-sm:snap-center"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
+              <div key={card.id} className="card-deal max-sm:snap-center">
                 <PlayingCard
                   card={card}
                   selected={isSelected}
@@ -533,6 +554,9 @@ export function GameTable({
           onDraw={drawFromDeck}
           onTake={takeDiscardButton}
           onCaramba={() => setConfirmCaramba(true)}
+          takeChoices={eligibleGroup?.cards.length ?? 0}
+          choosingDiscard={choosingDiscard}
+          takePending={pendingTakeId !== null}
         />
       </div>
 
@@ -634,38 +658,55 @@ function DiscardPile({
   title,
   cards,
   selectable,
-  selectedId,
+  emphasized,
+  pendingId,
   onSelect,
 }: {
   title: string;
   cards: Card[];
   selectable: boolean;
-  selectedId: string | null;
+  emphasized: boolean;
+  pendingId: string | null;
   onSelect: (cardId: string) => void;
 }) {
+  const locked = pendingId !== null;
   return (
-    <div className="text-center">
-      <div className="flex flex-wrap justify-center gap-1">
-        {cards.map((card, index) => (
-          <div
-            key={card.id}
-            className="origin-bottom"
-            style={{ transform: `rotate(${(index - (cards.length - 1) / 2) * 5}deg)` }}
-          >
-            <PlayingCard
-              card={card}
-              eligible={selectable}
-              selected={selectedId === card.id}
-              label={
-                selectable && selectedId === card.id
-                  ? `${card.rank} of ${card.suit}, tap again to take`
-                  : undefined
-              }
-              onSelect={selectable ? () => onSelect(card.id) : undefined}
-              compact
-            />
-          </div>
-        ))}
+    <div className="text-center" data-testid={selectable ? "eligible-discard" : undefined}>
+      <div
+        className={cn(
+          "flex flex-wrap justify-center",
+          selectable ? "gap-2" : "gap-1",
+          emphasized && "rounded-2xl bg-gold/10 p-1 ring-2 ring-[var(--gold)]",
+        )}
+        role="group"
+        aria-label={title}
+      >
+        {cards.map((card, index) => {
+          const pending = pendingId === card.id;
+          return (
+            <div
+              key={card.id}
+              className="origin-bottom focus-within:z-10"
+              style={{
+                transform: `rotate(${(index - (cards.length - 1) / 2) * (selectable ? 3 : 5)}deg)`,
+              }}
+            >
+              <PlayingCard
+                card={card}
+                eligible={selectable && !locked}
+                pending={pending}
+                selected={pending}
+                accent="gold"
+                disabled={locked}
+                label={selectable ? `Take ${card.rank} of ${card.suit} from discard` : undefined}
+                testId={selectable ? `take-card-${card.id}` : undefined}
+                onSelect={selectable && !locked ? () => onSelect(card.id) : undefined}
+                compact
+                className={selectable ? "h-20 w-16 sm:h-20 sm:w-16" : undefined}
+              />
+            </div>
+          );
+        })}
       </div>
       <p className="mt-1 text-xs text-gold">{title}</p>
     </div>

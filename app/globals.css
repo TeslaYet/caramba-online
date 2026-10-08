@@ -259,7 +259,7 @@ body::after {
 }
 
 .card-deal {
-  animation: card-deal 420ms ease-out both;
+  animation: card-deal 180ms ease-out both;
 }
 
 .card-shake {
@@ -267,18 +267,18 @@ body::after {
 }
 
 .fly-to-center {
-  animation: fly-to-center 480ms ease-out both;
+  animation: fly-to-center 220ms ease-out both;
 }
 
 .fly-to-seat {
-  animation: fly-to-seat 460ms ease-in both;
+  animation: fly-to-seat 220ms ease-in both;
 }
 
 @media (max-width: 639px) {
   .fly-to-center,
   .fly-to-seat {
     --flight: 0.55;
-    animation-duration: 320ms;
+    animation-duration: 180ms;
   }
 }
 
@@ -286,7 +286,7 @@ body::after {
   .fly-to-center,
   .fly-to-seat {
     --flight: 0.8;
-    animation-duration: 400ms;
+    animation-duration: 200ms;
   }
 }
 

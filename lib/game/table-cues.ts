@@ -88,10 +88,12 @@ export function presentNewEvents(input: {
     }
     if (event.type === "PLAYER_TOOK_DISCARD" && actorId) {
       const nextIds = new Set(input.groups.flatMap((group) => group.cards.map((card) => card.id)));
+      const previous = input.memory.groups.flatMap((group) => group.cards);
+      const requested = typeof event.payload.cardId === "string" ? event.payload.cardId : null;
       const removed =
-        input.memory.groups
-          .flatMap((group) => group.cards)
-          .find((card) => !nextIds.has(card.id)) ?? null;
+        (requested ? previous.find((card) => card.id === requested) : null) ??
+        previous.find((card) => !nextIds.has(card.id)) ??
+        null;
       cues.push({ id: event.id, kind: "pickup", actorId, card: removed });
     }
     if (event.type === "CARAMBA_CALLED" && actorId) {

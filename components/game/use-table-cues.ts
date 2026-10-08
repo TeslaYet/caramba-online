@@ -59,7 +59,7 @@ export function useTableCues(game: PublicGameState): TableCue[] {
         playSound(kind);
       }
     }
-    const timer = window.setTimeout(() => setCues([]), reduceMotion ? 0 : 720);
+    const timer = window.setTimeout(() => setCues([]), reduceMotion ? 0 : 260);
     return () => window.clearTimeout(timer);
   }, [cues, playSound, reduceMotion]);
 

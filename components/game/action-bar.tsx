@@ -16,6 +16,9 @@ export function ActionBar({
   onDraw,
   onTake,
   onCaramba,
+  takeChoices,
+  choosingDiscard,
+  takePending,
 }: {
   game: PublicGameState;
   validation: DiscardValidation;
@@ -25,6 +28,9 @@ export function ActionBar({
   onDraw: () => void;
   onTake: () => void;
   onCaramba: () => void;
+  takeChoices: number;
+  choosingDiscard: boolean;
+  takePending: boolean;
 }) {
   const mine = game.me?.isCurrent && game.status === "PLAYING";
   const discardPhase = mine && game.turnPhase === "DISCARD";
@@ -54,7 +60,9 @@ export function ActionBar({
           )}
           {drawPhase && (
             <p className="text-xs text-cream/70">
-              {verb} a discard card twice, or press Take Discard.
+              {choosingDiscard
+                ? "Choose one card from the discard."
+                : `${verb} the exact discard card you want.`}
             </p>
           )}
           {discardPhase && !canCallCaramba && (
@@ -93,10 +101,10 @@ export function ActionBar({
           className={cn("max-sm:min-h-11", !canTakeDiscard && "max-sm:hidden")}
           variant="secondary"
           onClick={onTake}
-          disabled={!canTakeDiscard}
+          disabled={!canTakeDiscard || takePending}
           data-testid="take-discard-button"
         >
-          Take Discard
+          {takeChoices > 1 && choosingDiscard ? "Choose a card" : "Take Discard"}
         </Button>
         <Button
           className={cn("max-sm:min-h-11", !canCallCaramba && "max-sm:hidden")}

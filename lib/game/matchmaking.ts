@@ -12,6 +12,7 @@ export interface QueueEntry {
 
 export const QUEUE_STALE_MS = 20_000;
 export const QUEUE_WAIT_MS = 8_000;
+export const QUEUE_SOLO_MATCH_MS = 60_000;
 
 export function pruneQueue(entries: QueueEntry[], now: number, staleMs = QUEUE_STALE_MS): QueueEntry[] {
   return entries.filter((entry) => now - entry.lastSeenAt <= staleMs);
@@ -61,5 +62,27 @@ export function claimMatch(
   return {
     claimed,
     rest: entries.filter((entry) => !ids.has(entry.userId)),
+  };
+}
+
+/** Casual only. One person who has waited a minute can be paired with a bot. */
+export function claimSolo(
+  entries: QueueEntry[],
+  mode: QueueMode,
+  now: number,
+): { solo: QueueEntry; rest: QueueEntry[] } | null {
+  if (mode !== "casual") {
+    return null;
+  }
+  const waiting = entries
+    .filter((entry) => entry.mode === mode)
+    .sort((a, b) => a.joinedAt - b.joinedAt);
+  const solo = waiting[0];
+  if (waiting.length !== 1 || !solo || now - solo.joinedAt < QUEUE_SOLO_MATCH_MS) {
+    return null;
+  }
+  return {
+    solo,
+    rest: entries.filter((entry) => entry.userId !== solo.userId),
   };
 }

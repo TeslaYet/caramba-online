@@ -3,7 +3,7 @@ import { privateJson, readJson, withApi } from "@/lib/server/api";
 import { readAuthUser } from "@/lib/server/auth-user";
 import { HttpError } from "@/lib/server/errors";
 import { createMatchedRoom } from "@/lib/server/game-service";
-import { attachMatchCode, enqueuePlayer, heartbeat, queueStatus, releaseClaim, takeMatch } from "@/lib/server/match-queue";
+import { attachMatchCode, enqueuePlayer, heartbeat, queueStatus, releaseClaim, takeMatch, takeSolo } from "@/lib/server/match-queue";
 import { getProfile } from "@/lib/server/profiles";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
 
@@ -13,19 +13,27 @@ const schema = z.object({
 
 async function form(mode: "casual" | "ranked") {
   const claimed = await takeMatch(mode);
-  if (!claimed) {
-    return null;
+  if (claimed) {
+    return openRoom(claimed, false);
   }
+  const solo = await takeSolo(mode);
+  if (solo) {
+    return openRoom([solo], true);
+  }
+  return null;
+}
+
+async function openRoom(players: Parameters<typeof createMatchedRoom>[0], bot: boolean) {
   try {
-    const code = await createMatchedRoom(claimed);
+    const code = await createMatchedRoom(players, { bot });
     await attachMatchCode(
-      claimed.map((entry) => entry.id),
-      claimed.map((entry) => entry.userId),
+      players.map((entry) => entry.id),
+      players.map((entry) => entry.userId),
       code,
     );
-    return { code, players: claimed.length };
+    return { code, players: players.length + (bot ? 1 : 0) };
   } catch (error) {
-    await releaseClaim(claimed.map((entry) => entry.id));
+    await releaseClaim(players.map((entry) => entry.id));
     throw error;
   }
 }

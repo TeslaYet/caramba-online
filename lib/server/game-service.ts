@@ -644,8 +644,13 @@ export async function createPracticeGame(
   return { code: room.code, game: getPublicGameStateForPlayer(game, playerId) };
 }
 
-export async function createMatchedRoom(entries: QueueEntry[]) {
-  if (entries.length < 2 || entries.length > GAME_RULES.MAX_PLAYERS) {
+export async function createMatchedRoom(entries: QueueEntry[], options?: { bot?: boolean }) {
+  const withBot = options?.bot === true;
+  if (withBot) {
+    if (entries.length !== 1 || entries[0]?.mode !== "casual") {
+      throw new HttpError("A bot match is only for one player in a casual game.");
+    }
+  } else if (entries.length < 2 || entries.length > GAME_RULES.MAX_PLAYERS) {
     throw new HttpError("A match needs between 2 and 8 players.");
   }
   const host = entries[0];
@@ -653,6 +658,18 @@ export async function createMatchedRoom(entries: QueueEntry[]) {
     throw new HttpError("A match needs between 2 and 8 players.");
   }
   const now = Date.now();
+  const botId = crypto.randomUUID();
+  const seats = [
+    ...entries.map((entry) => ({
+      id: entry.playerId,
+      nickname: normalizeNickname(entry.nickname).slice(0, 16),
+      userId: entry.userId,
+      isBot: false,
+    })),
+    ...(withBot
+      ? [{ id: botId, nickname: "Nico · Bot", userId: null as string | null, isBot: true }]
+      : []),
+  ];
   const room: RoomRecord = {
     id: crypto.randomUUID(),
     code: generateRoomCode(secureRandomInt),
@@ -667,20 +684,21 @@ export async function createMatchedRoom(entries: QueueEntry[]) {
     updatedAt: now,
   };
   await store().saveRoom(room);
-  for (const [index, entry] of entries.entries()) {
-    const nickname = normalizeNickname(entry.nickname).slice(0, 16);
+  for (const [index, seat] of seats.entries()) {
+    const nickname = isValidNickname(seat.nickname) ? seat.nickname : `Player ${index + 1}`;
     await store().savePlayer({
-      id: entry.playerId,
+      id: seat.id,
       roomId: room.id,
-      nickname: isValidNickname(nickname) ? nickname : `Player ${index + 1}`,
+      nickname,
       seatIndex: index,
       connected: true,
       ready: true,
       createdAt: now,
       updatedAt: now,
     });
+    seat.nickname = nickname;
   }
-  const game = createInitialGame({
+  let game = createInitialGame({
     id: crypto.randomUUID(),
     roomId: room.id,
     roomCode: room.code,
@@ -689,15 +707,20 @@ export async function createMatchedRoom(entries: QueueEntry[]) {
     resetScore: 50,
     mode: host.mode,
     randomInt: secureRandomInt,
-    players: entries.map((entry, index) => ({
-      id: entry.playerId,
-      nickname: normalizeNickname(entry.nickname).slice(0, 16) || `Player ${index + 1}`,
+    players: seats.map((seat, index) => ({
+      id: seat.id,
+      nickname: seat.nickname,
       seatIndex: index,
       connected: true,
       ready: true,
-      userId: entry.userId,
+      userId: seat.userId,
+      isBot: seat.isBot,
+      botDifficulty: seat.isBot ? "normal" : undefined,
     })),
   });
+  if (withBot) {
+    game = playBotTurns(game, secureRandomInt);
+  }
   await store().saveGame(game);
   await store().saveRoom({ ...room, gameId: game.id, updatedAt: Date.now() });
   await publishRoom(room.code);
