@@ -10,14 +10,14 @@ import {
   GameEngineError,
   playCards,
   rematch as rematchGame,
-  setPlayerConnected,
   startNextRound,
   takePreviousDiscard,
 } from "@/lib/game/game-engine";
-import { getPublicGameStateForPlayer } from "@/lib/game/projection";
+import { getPublicGameStateForPlayer, withPresence } from "@/lib/game/projection";
 import { GAME_RULES } from "@/lib/game/rules";
 import { parseScoreSettings, readScoreRules } from "@/lib/game/score-settings";
-import type { BotDifficulty, Card, GameMode, GameState, PublicGameState, RoomRecord } from "@/lib/game/types";
+import { balanceTeams, randomizeTeams, validateTeamLineup, isTeamTableSize } from "@/lib/game/teams";
+import type { BotDifficulty, Card, GameMode, GameState, PublicGameState, RoomRecord, TableFormat, TeamId } from "@/lib/game/types";
 import { getStore, StaleVersionError, type RoomPlayer } from "@/lib/store";
 import { generateRoomCode, isValidNickname, normalizeNickname, normalizeRoomCode } from "@/lib/utils/identity";
 import { assertHost } from "./authorization";
@@ -25,14 +25,28 @@ import { HttpError } from "./errors";
 import { withRoomLock } from "./mutex";
 import { consumeRateLimit } from "./rate-limit";
 import { settleMatch } from "./profiles";
+import { shouldUpdatePresence } from "./presence";
+import { logSync } from "./sync-log";
 import type { QueueEntry } from "@/lib/game/matchmaking";
 
 function store() {
   return getStore();
 }
 
-async function publishRoom(code: string) {
-  await store().publish(code);
+function publishRoom(code: string) {
+  const started = Date.now();
+  void store()
+    .publish(code)
+    .then(() => {
+      logSync("publish", { code, ms: Date.now() - started });
+    })
+    .catch((error: unknown) => {
+      logSync("publish_failed", {
+        code,
+        ms: Date.now() - started,
+        message: error instanceof Error ? error.message : "publish failed",
+      });
+    });
 }
 
 function wrapEngine(error: unknown): never {
@@ -87,6 +101,7 @@ export async function createRoom(
     maxScore: rules.maxScore,
     resetScore: rules.resetScore,
     mode: options?.mode ?? "private",
+    format: "individual",
     gameId: null,
     createdAt: now,
     updatedAt: now,
@@ -192,7 +207,7 @@ export async function getRoomSnapshot(code: string, viewerId: string | null) {
     room,
     players,
     viewerId,
-    game: game ? getPublicGameStateForPlayer(game, viewerId) : null,
+    game: game ? withPresence(getPublicGameStateForPlayer(game, viewerId), players) : null,
   };
 }
 
@@ -234,7 +249,12 @@ export async function startGame(code: string, playerId: string) {
   return withRoomLock(code, async () => {
     const { room, players } = await loadRoomContext(code);
     assertHost(room, playerId, "Only the host can start the game.");
-    if (players.length < GAME_RULES.MIN_PLAYERS) {
+    if ((room.format ?? "individual") === "teams") {
+      const problem = validateTeamLineup(players, room.maxPlayers);
+      if (problem) {
+        throw new HttpError(problem);
+      }
+    } else if (players.length < GAME_RULES.MIN_PLAYERS) {
       throw new HttpError("At least 2 players are required to start.");
     }
     const unready = players.filter((player) => player.id !== playerId && !player.ready);
@@ -255,7 +275,9 @@ export async function startGame(code: string, playerId: string) {
           seatIndex: player.seatIndex,
           connected: player.connected,
           ready: true,
+          teamId: room.format === "teams" ? (player.teamId ?? null) : null,
         })),
+        format: room.format ?? "individual",
         randomInt: secureRandomInt,
         maxScore: room.maxScore,
         resetScore: room.resetScore,
@@ -414,10 +436,16 @@ async function mutateGame(
       throw new HttpError("The game has not started yet.");
     }
     const version = game.version;
+    const started = Date.now();
     try {
-      let next = playBotTurns(mutator(game), secureRandomInt);
+      const mutated = mutator(game);
+      if (mutated === game) {
+        return getPublicGameStateForPlayer(game, playerId);
+      }
+      let next = playBotTurns(mutated, secureRandomInt);
       next = await settleMatch(next);
       await saveGame(next, version);
+      logSync("commit", { code, ms: Date.now() - started, version: next.version });
       await store().saveRoom({
         ...room,
         status: next.status === "GAME_OVER" ? "PLAYING" : room.status,
@@ -451,6 +479,9 @@ export function caramba(code: string, playerId: string) {
 export function nextRound(code: string, playerId: string) {
   return mutateGame(code, playerId, (game) => {
     assertGameMember(game, playerId);
+    if (game.status === "PLAYING" || game.status === "GAME_OVER") {
+      return game;
+    }
     return startNextRound(game, secureRandomInt);
   });
 }
@@ -502,26 +533,27 @@ export async function backToLobby(code: string, playerId: string) {
   });
 }
 
-export async function markConnected(code: string, playerId: string, connected: boolean) {
-  return withRoomLock(code, async () => {
-    try {
-      const { room, players, game } = await loadRoomContext(code);
-      const player = players.find((entry) => entry.id === playerId);
-      if (!player) {
-        return;
-      }
-      await store().savePlayer({ ...player, connected, updatedAt: Date.now() });
-      if (game) {
-        const next = setPlayerConnected(game, playerId, connected);
-        if (next !== game) {
-          await store().saveGame(next);
-        }
-      }
-      await publishRoom(room.code);
-    } catch {
+export async function markConnected(
+  code: string,
+  playerId: string,
+  connected: boolean,
+  notBefore = 0,
+) {
+  try {
+    const room = await store().getRoomByCode(normalizeRoomCode(code));
+    if (!room || room.status === "CLOSED") {
       return;
     }
-  });
+    const players = await store().listPlayers(room.id);
+    const player = players.find((entry) => entry.id === playerId);
+    if (!player || !shouldUpdatePresence(player, connected, notBefore)) {
+      return;
+    }
+    await store().savePlayer({ ...player, connected, updatedAt: Date.now() });
+    publishRoom(room.code);
+  } catch {
+    return;
+  }
 }
 
 export async function arrangeHands(
@@ -569,7 +601,7 @@ export async function updateScoreSettings(
   });
 }
 
-const BOT_NAMES = ["Nico", "Remy", "Sol"];
+const BOT_NAMES = ["Nico", "Remy", "Sol", "Lina", "Otto", "Paz", "Ivo"];
 
 export async function createPracticeGame(
   playerId: string,
@@ -577,7 +609,11 @@ export async function createPracticeGame(
   difficulty: BotDifficulty,
   maxScore?: number,
   resetScore?: number,
+  opponents = 3,
 ) {
+  if (!Number.isInteger(opponents) || opponents < 1 || opponents > 7) {
+    throw new HttpError("Choose between 1 and 7 bot opponents.");
+  }
   const name = normalizeNickname(nickname);
   if (!isValidNickname(name)) {
     throw new HttpError("Choose a nickname between 2 and 16 characters.");
@@ -589,17 +625,18 @@ export async function createPracticeGame(
     code: generateRoomCode(secureRandomInt),
     hostPlayerId: playerId,
     status: "PLAYING",
-    maxPlayers: 4,
+    maxPlayers: 1 + opponents,
     maxScore: rules.maxScore,
     resetScore: rules.resetScore,
     mode: "practice",
+    format: "individual" as const,
     gameId: null,
     createdAt: now,
     updatedAt: now,
   };
   const seats = [
     { id: playerId, nickname: name, isBot: false as const },
-    ...BOT_NAMES.map((botName) => ({
+    ...BOT_NAMES.slice(0, opponents).map((botName) => ({
       id: crypto.randomUUID(),
       nickname: `${botName} · Bot`,
       isBot: true as const,
@@ -675,10 +712,11 @@ export async function createMatchedRoom(entries: QueueEntry[], options?: { bot?:
     code: generateRoomCode(secureRandomInt),
     hostPlayerId: host.playerId,
     status: "PLAYING",
-    maxPlayers: GAME_RULES.MAX_PLAYERS,
+    maxPlayers: seats.length,
     maxScore: 100,
     resetScore: 50,
     mode: host.mode,
+    format: "individual" as const,
     gameId: null,
     createdAt: now,
     updatedAt: now,
@@ -706,6 +744,7 @@ export async function createMatchedRoom(entries: QueueEntry[], options?: { bot?:
     maxScore: 100,
     resetScore: 50,
     mode: host.mode,
+    format: "individual",
     randomInt: secureRandomInt,
     players: seats.map((seat, index) => ({
       id: seat.id,
@@ -725,6 +764,102 @@ export async function createMatchedRoom(entries: QueueEntry[], options?: { bot?:
   await store().saveRoom({ ...room, gameId: game.id, updatedAt: Date.now() });
   await publishRoom(room.code);
   return room.code;
+}
+
+async function requireLobbyHost(code: string, playerId: string) {
+  const { room, players } = await loadRoomContext(code);
+  assertHost(room, playerId, "Only the host can change the table.");
+  if (room.status !== "LOBBY") {
+    throw new HttpError("Table settings lock when the game starts.");
+  }
+  return { room, players };
+}
+
+export async function setTableFormat(
+  code: string,
+  playerId: string,
+  format: TableFormat,
+  seats?: number,
+) {
+  return withRoomLock(code, async () => {
+    const { room, players } = await requireLobbyHost(code, playerId);
+    if (format === "teams") {
+      const size = seats ?? 4;
+      if (!isTeamTableSize(size)) {
+        throw new HttpError("Team games are 2v2, 3v3, or 4v4.");
+      }
+      if (players.length > size) {
+        throw new HttpError(
+          `This room already has ${players.length} players. Choose a larger team game or remove someone.`,
+        );
+      }
+      await store().saveRoom({
+        ...room,
+        format: "teams",
+        maxPlayers: size,
+        updatedAt: Date.now(),
+      });
+    } else {
+      await store().saveRoom({
+        ...room,
+        format: "individual",
+        maxPlayers: GAME_RULES.MAX_PLAYERS,
+        updatedAt: Date.now(),
+      });
+      for (const player of players) {
+        if (player.teamId) {
+          await store().savePlayer({ ...player, teamId: null, updatedAt: Date.now() });
+        }
+      }
+    }
+    publishRoom(room.code);
+    return getRoomSnapshot(room.code, playerId);
+  });
+}
+
+export async function assignTeam(
+  code: string,
+  playerId: string,
+  targetId: string,
+  teamId: TeamId | null,
+) {
+  return withRoomLock(code, async () => {
+    const { room, players } = await requireLobbyHost(code, playerId);
+    if ((room.format ?? "individual") !== "teams") {
+      throw new HttpError("Switch the room to team mode before assigning teams.");
+    }
+    const target = players.find((player) => player.id === targetId);
+    if (!target) {
+      throw new HttpError("That player is not in this room.");
+    }
+    await store().savePlayer({ ...target, teamId, updatedAt: Date.now() });
+    publishRoom(room.code);
+    return getRoomSnapshot(room.code, playerId);
+  });
+}
+
+export async function arrangeRoomTeams(
+  code: string,
+  playerId: string,
+  how: "balance" | "random",
+) {
+  return withRoomLock(code, async () => {
+    const { room, players } = await requireLobbyHost(code, playerId);
+    if ((room.format ?? "individual") !== "teams") {
+      throw new HttpError("Switch the room to team mode before assigning teams.");
+    }
+    const assignments =
+      how === "random" ? randomizeTeams(players, secureRandomInt) : balanceTeams(players);
+    for (const player of players) {
+      await store().savePlayer({
+        ...player,
+        teamId: assignments.get(player.id) ?? null,
+        updatedAt: Date.now(),
+      });
+    }
+    publishRoom(room.code);
+    return getRoomSnapshot(room.code, playerId);
+  });
 }
 
 export function isTestMode() {

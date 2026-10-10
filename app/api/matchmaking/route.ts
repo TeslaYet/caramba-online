@@ -9,6 +9,7 @@ import { consumeRateLimit } from "@/lib/server/rate-limit";
 
 const schema = z.object({
   mode: z.enum(["casual", "ranked"]),
+  playerCount: z.number().int().min(2).max(8).optional(),
 });
 
 async function form(mode: "casual" | "ranked") {
@@ -50,7 +51,7 @@ export const GET = withApi(async (request, playerId) => {
   if (!status.mode) {
     return privateJson({ status: "idle", playersFound: 0 });
   }
-  const playersFound = await heartbeat(user.id, status.mode);
+  const playersFound = await heartbeat(user.id, status.mode, status.playerCount);
   const formed = await form(status.mode);
   if (formed) {
     const mine = await queueStatus(user.id);
@@ -75,13 +76,17 @@ export const POST = withApi(async (request, playerId) => {
   if (!profile) {
     throw new HttpError("Your profile is not ready yet.", 401);
   }
-  const { mode } = await readJson(request, schema);
+  const { mode, playerCount } = await readJson(request, schema);
+  if (mode === "ranked" && !playerCount) {
+    throw new HttpError("Choose a ranked game size from 2 to 8 players.");
+  }
   const queued = await enqueuePlayer({
     id: crypto.randomUUID(),
     userId: user.id,
     playerId,
     nickname: profile.displayName,
     mode,
+    playerCount: mode === "ranked" ? playerCount : undefined,
     joinedAt: Date.now(),
     lastSeenAt: Date.now(),
   });

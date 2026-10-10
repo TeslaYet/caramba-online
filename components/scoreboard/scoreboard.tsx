@@ -107,6 +107,10 @@ export function Scoreboard({
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">
                   {row.nickname}
+                  {game.format === "teams" &&
+                  game.players.find((player) => player.id === row.playerId)?.teamId
+                    ? ` · Team ${game.players.find((player) => player.id === row.playerId)?.teamId}`
+                    : ""}
                   {local ? <span className="sr-only">, you</span> : null}
                 </span>
                 <StandingNote row={row} leader={leader} />

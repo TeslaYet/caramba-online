@@ -6,6 +6,7 @@ export interface QueueEntry {
   playerId: string;
   nickname: string;
   mode: QueueMode;
+  playerCount?: number;
   joinedAt: number;
   lastSeenAt: number;
 }
@@ -46,6 +47,32 @@ export function claimMatch(
   const waiting = entries
     .filter((entry) => entry.mode === mode)
     .sort((a, b) => a.joinedAt - b.joinedAt);
+  if (mode === "ranked") {
+    const groups = new Map<number, QueueEntry[]>();
+    for (const entry of waiting) {
+      const size = entry.playerCount;
+      if (!size || size < 2 || size > 8) {
+        continue;
+      }
+      const group = groups.get(size) ?? [];
+      group.push(entry);
+      groups.set(size, group);
+    }
+    const ready = [...groups.entries()]
+      .filter(([size, group]) => group.length >= size)
+      .sort((a, b) => (a[1][0]?.joinedAt ?? 0) - (b[1][0]?.joinedAt ?? 0));
+    const match = ready[0];
+    if (!match) {
+      return null;
+    }
+    const [size, group] = match;
+    const claimed = group.slice(0, size);
+    const ids = new Set(claimed.map((entry) => entry.userId));
+    return {
+      claimed,
+      rest: entries.filter((entry) => !ids.has(entry.userId)),
+    };
+  }
   if (waiting.length < 2) {
     return null;
   }

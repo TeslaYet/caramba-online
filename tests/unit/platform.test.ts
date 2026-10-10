@@ -6,13 +6,19 @@ import { unreadCount } from "@/lib/ui/chat-notice";
 import { canPlayAudio } from "@/lib/ui/audio";
 import { claimMatch, claimSolo, joinQueue, leaveQueue, QUEUE_SOLO_MATCH_MS, type QueueEntry } from "@/lib/game/matchmaking";
 
-function entry(userId: string, at: number, mode: QueueEntry["mode"] = "casual"): QueueEntry {
+function entry(
+  userId: string,
+  at: number,
+  mode: QueueEntry["mode"] = "casual",
+  playerCount?: number,
+): QueueEntry {
   return {
     id: userId,
     userId,
     playerId: `player-${userId}`,
     nickname: userId,
     mode,
+    playerCount,
     joinedAt: at,
     lastSeenAt: at,
   };
@@ -50,8 +56,33 @@ describe("matchmaking queue", () => {
   });
 
   it("does not mix casual and ranked players", () => {
-    const queued = [entry("a", 0, "casual"), entry("b", 0, "ranked")];
+    const queued = [entry("a", 0, "casual"), entry("b", 0, "ranked", 2)];
     expect(claimMatch(queued, "ranked", 20_000)).toBeNull();
+  });
+
+  it("keeps ranked table sizes in separate queues", () => {
+    const queued = [
+      entry("a", 0, "ranked", 4),
+      entry("b", 1, "ranked", 4),
+      entry("c", 2, "ranked", 4),
+      entry("d", 3, "ranked", 2),
+      entry("e", 4, "ranked", 2),
+    ];
+    const twos = claimMatch(queued, "ranked", 1);
+    expect(twos?.claimed.map((item) => item.userId)).toEqual(["d", "e"]);
+    const fours = claimMatch(twos?.rest ?? [], "ranked", 100_000);
+    expect(fours).toBeNull();
+    const full = claimMatch(
+      [...(twos?.rest ?? []), entry("f", 5, "ranked", 4)],
+      "ranked",
+      1,
+    );
+    expect(full?.claimed.map((item) => item.userId)).toEqual(["a", "b", "c", "f"]);
+  });
+
+  it("does not start a ranked game before the chosen size is full", () => {
+    const queued = [entry("a", 0, "ranked", 8), entry("b", 1, "ranked", 8)];
+    expect(claimMatch(queued, "ranked", 60_000)).toBeNull();
   });
 
   it("starts a casual 1v1 with a bot after one player waits a minute", () => {
@@ -75,6 +106,21 @@ describe("ranked rating", () => {
     expect(winner && winner.delta).toBeGreaterThan(0);
     expect(last && last.delta).toBeLessThan(0);
     expect(winner?.after).toBe((winner?.before ?? 0) + (winner?.delta ?? 0));
+  });
+
+  it("does not let an eight-player table swing more than a two-player table", () => {
+    const pair = rateMatch([
+      { id: "a", rating: 1200, place: 1 },
+      { id: "b", rating: 1200, place: 2 },
+    ]);
+    const table = rateMatch(
+      Array.from({ length: 8 }, (_, index) => ({
+        id: `p${index}`,
+        rating: 1200,
+        place: index + 1,
+      })),
+    );
+    expect(Math.abs(table[0]?.delta ?? 0)).toBeLessThanOrEqual(Math.abs(pair[0]?.delta ?? 0) + 1);
   });
 
   it("leaves rating untouched outside ranked games", () => {

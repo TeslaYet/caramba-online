@@ -17,6 +17,9 @@ import {
   startGame,
   takeDiscard,
   updateScoreSettings,
+  setTableFormat,
+  assignTeam,
+  arrangeRoomTeams,
 } from "@/lib/server/game-service";
 
 const schema = z.discriminatedUnion("type", [
@@ -41,6 +44,20 @@ const schema = z.discriminatedUnion("type", [
     type: z.literal("UPDATE_SETTINGS"),
     maxScore: z.number().int(),
     resetScore: z.number().int(),
+  }),
+  z.object({
+    type: z.literal("SET_FORMAT"),
+    format: z.enum(["individual", "teams"]),
+    seats: z.union([z.literal(4), z.literal(6), z.literal(8)]).optional(),
+  }),
+  z.object({
+    type: z.literal("ASSIGN_TEAM"),
+    playerId: z.string(),
+    teamId: z.enum(["A", "B"]).nullable(),
+  }),
+  z.object({
+    type: z.literal("ARRANGE_TEAMS"),
+    how: z.enum(["balance", "random"]),
   }),
 ]);
 
@@ -87,6 +104,12 @@ export async function POST(
         return privateJson(
           await updateScoreSettings(code, playerId, action.maxScore, action.resetScore),
         );
+      case "SET_FORMAT":
+        return privateJson(await setTableFormat(code, playerId, action.format, action.seats));
+      case "ASSIGN_TEAM":
+        return privateJson(await assignTeam(code, playerId, action.playerId, action.teamId));
+      case "ARRANGE_TEAMS":
+        return privateJson(await arrangeRoomTeams(code, playerId, action.how));
     }
   })(request);
 }

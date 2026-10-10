@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { ScoreFields } from "@/components/lobby/score-fields";
+import { TeamSetup } from "@/components/lobby/team-setup";
 import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/game/chat-panel";
 import { PlayerSeat } from "@/components/game/player-seat";
@@ -13,11 +14,13 @@ export function RoomLobby({
   selfId,
   actionError,
   onAction,
+  connection = "live",
 }: {
   snapshot: RoomSnapshot;
   selfId: string | null;
   actionError?: string | null;
   onAction: (payload: Record<string, unknown>) => Promise<unknown>;
+  connection?: "connecting" | "live" | "reconnecting";
 }) {
   const { room, players, game } = snapshot;
   const self = players.find((player) => player.id === selfId);
@@ -60,6 +63,11 @@ export function RoomLobby({
           </div>
         </div>
         <p className="mt-2 text-cream/70">Room code: {room.code}</p>
+        {connection !== "live" && (
+          <p className="mt-1 text-sm text-gold" data-testid="connection-status">
+            Reconnecting. The room will catch up on its own.
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Button variant="gold" onClick={() => copy("code")} data-testid="copy-code">
             {copied === "code" ? "Copied code" : "Copy Code"}
@@ -116,6 +124,8 @@ export function RoomLobby({
           {actionError}
         </p>
       )}
+
+      <TeamSetup snapshot={snapshot} isHost={isHost} onAction={onAction} />
 
       <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-4 text-left">
         <p className="text-xs uppercase tracking-[0.2em] text-gold">Score settings</p>

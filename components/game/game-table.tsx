@@ -22,6 +22,7 @@ import { Scoreboard } from "@/components/scoreboard/scoreboard";
 import { Button } from "@/components/ui/button";
 import { calculateHandScore } from "@/lib/game/scoring";
 import type { Card, PublicGameState } from "@/lib/game/types";
+import type { RoomConnection } from "@/lib/realtime/use-room";
 import { validateDiscard } from "@/lib/game/validators";
 import { useAdaptiveDevice } from "@/components/providers/adaptive-device";
 import { usePreferences } from "@/components/providers/preferences-provider";
@@ -43,11 +44,13 @@ export function GameTable({
   onAction,
   onLeave,
   actionError,
+  connection = "live",
 }: {
   game: PublicGameState;
   onAction: (payload: Record<string, unknown>) => Promise<unknown>;
   onLeave: () => void;
   actionError?: string | null;
+  connection?: RoomConnection;
 }) {
   const { playSound, sound, setSound, reduceMotion, setReduceMotion } =
     usePreferences();
@@ -76,10 +79,6 @@ export function GameTable({
     setChoosingDiscard(false);
     setPendingTakeId(null);
   }
-  const turnKey = `${game.currentPlayerId}:${game.turnPhase}:${game.roundNumber}`;
-  useEffect(() => {
-    pendingTake.current = null;
-  }, [turnKey]);
   const [confirmCaramba, setConfirmCaramba] = useState(false);
   const [showBoard, setShowBoard] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -290,9 +289,21 @@ export function GameTable({
               <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
                 Room {game.roomCode}
               </p>
-              <h1 className="font-display text-xl leading-none">
-                {game.me?.isCurrent ? "Your turn" : `${game.players.find((p) => p.id === game.currentPlayerId)?.nickname ?? "Player"}'s turn`}
+              <h1 className="font-display text-xl leading-none" data-testid="turn-banner">
+                {game.status === "PLAYING"
+                  ? game.me?.isCurrent
+                    ? "Your turn"
+                    : `${turnName}'s turn`
+                  : `Round ${game.roundNumber || 1}`}
               </h1>
+              {game.status === "PLAYING" && !game.me?.isCurrent && (
+                <p className="text-xs text-cream/60">Waiting for {turnName}</p>
+              )}
+              {connection !== "live" && (
+                <p className="text-xs text-gold" data-testid="connection-status">
+                  Reconnecting. The table will catch up on its own.
+                </p>
+              )}
               <p className="text-xs text-cream/70 sm:hidden">{shownScore} pts</p>
             </div>
           </div>
@@ -361,6 +372,7 @@ export function GameTable({
             ))}
         </div>
 
+        <div className="relative flex min-h-0 w-full flex-1 flex-col">
         <div className={cn("table-stage relative min-h-0 w-full flex-1", showdown === "announce" && !reduceMotion && "carramba-stage")}>
           <div className="rainbow-rim absolute inset-[6%] rounded-[50%] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
             <div className="felt-texture h-full w-full rounded-[50%]" />
@@ -427,14 +439,6 @@ export function GameTable({
           })}
 
           <TableMotion cues={cues} seatOffset={seatOffset} showCall={showdown === null} />
-          <div className="absolute left-2 right-2 top-9 z-30 sm:bottom-2 sm:left-1/2 sm:right-auto sm:top-auto sm:w-80 sm:-translate-x-1/2">
-            <CommentaryFeed
-              events={game.events}
-              players={game.players}
-              showResults={showdown === null || showdown === "result"}
-              compact={!isDesktop}
-            />
-          </div>
           <p
             key={game.currentPlayerId ?? "waiting"}
             className="turn-chip absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.22em] text-gold sm:hidden"
@@ -511,6 +515,12 @@ export function GameTable({
               </div>
             )}
           </div>
+        </div>
+        <CommentaryFeed
+          events={game.events}
+          players={game.players}
+          showResults={showdown === null || showdown === "result"}
+        />
         </div>
 
         <div

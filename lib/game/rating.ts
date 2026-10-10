@@ -21,9 +21,10 @@ export function expectedPair(rating: number, opponent: number): number {
 }
 
 /**
- * Multiplayer rating. Each player is compared with every other player.
- * The K factor is shared across opponents so a larger table does not
- * multiply the swing by the player count.
+ * One shared ranked rating for every human table size from 2 to 8.
+ * Each player is compared with every other player. The K factor is shared
+ * across opponents so a larger table does not multiply the swing by the
+ * player count. Bot games and private team games do not use this.
  */
 export function rateMatch(players: RatedPlayer[]): RatingChange[] {
   if (players.length < 2) {

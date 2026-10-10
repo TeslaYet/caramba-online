@@ -3,6 +3,20 @@ import { readScoreRules } from "./score-settings";
 import { calculateHandScore } from "./scoring";
 import type { GameState, PublicGameState, PublicPlayerView } from "./types";
 
+export function withPresence(
+  game: PublicGameState,
+  players: Array<{ id: string; connected: boolean }>,
+): PublicGameState {
+  const connected = new Map(players.map((player) => [player.id, player.connected]));
+  return {
+    ...game,
+    players: game.players.map((player) => ({
+      ...player,
+      connected: connected.has(player.id) ? Boolean(connected.get(player.id)) : player.connected,
+    })),
+  };
+}
+
 function eligibleDiscardGroupId(state: GameState): string | null {
   if (state.status !== "PLAYING") {
     return null;
@@ -33,6 +47,7 @@ export function getPublicGameStateForPlayer(
       isHost: player.id === gameState.hostPlayerId,
       isCurrent: player.id === gameState.currentPlayerId,
       hand: isMe || revealHands ? [...player.hand] : null,
+      teamId: player.teamId ?? null,
     };
   });
 
@@ -71,7 +86,7 @@ export function getPublicGameStateForPlayer(
       : null,
     roundResult: revealHands ? gameState.roundResult : null,
     nextRoundAt: gameState.nextRoundAt,
-    events: gameState.events.map((event) => ({
+    events: gameState.events.slice(-48).map((event) => ({
       ...event,
       payload: sanitizeEventPayload(event.type, event.payload),
     })),
@@ -80,6 +95,8 @@ export function getPublicGameStateForPlayer(
     maxScore: readScoreRules(gameState).maxScore,
     resetScore: readScoreRules(gameState).resetScore,
     mode: gameState.mode ?? "private",
+    format: gameState.format ?? "individual",
+    winnerTeamId: gameState.winnerTeamId ?? null,
     ratingDeltas: gameState.status === "GAME_OVER" ? (gameState.ratingDeltas ?? null) : null,
   };
 }

@@ -11,7 +11,7 @@ export default function RoomPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const code = String(params.code ?? "").toUpperCase();
-  const { snapshot, error, actionError, act } = useRoom(code);
+  const { snapshot, error, actionError, connection, act } = useRoom(code);
 
   useEffect(() => {
     if (snapshot?.game?.status === "PLAYING" && snapshot.game.id) {
@@ -55,6 +55,7 @@ export default function RoomPage() {
           router.push("/");
         }}
         actionError={actionError}
+        connection={connection}
       />
     );
   }
@@ -64,6 +65,7 @@ export default function RoomPage() {
       snapshot={snapshot}
       selfId={snapshot.viewerId}
       actionError={actionError}
+      connection={connection}
       onAction={async (payload) => {
         try {
           const result = await act(payload);

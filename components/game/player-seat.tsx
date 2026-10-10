@@ -31,7 +31,7 @@ export function PlayerSeat({
       <div
         className={cn(
           "flex w-[7.25rem] shrink-0 items-center gap-1.5 rounded-full border-2 px-2 py-1",
-          player.isCurrent ? "border-[var(--gold)] bg-[var(--gold)]/20" : "border-white/20 bg-[var(--panel)]",
+          player.isCurrent ? "border-[var(--gold)] bg-[var(--gold)]/25" : "border-white/20 bg-[var(--panel)]",
           player.eliminated && "opacity-60 grayscale",
         )}
       >
@@ -50,6 +50,10 @@ export function PlayerSeat({
             {" · "}
             <LiveScore score={player.score} />
           </p>
+          {player.teamId && (
+            <p className="text-[10px] font-bold uppercase text-gold">Team {player.teamId}</p>
+          )}
+          {player.isCurrent && <p className="text-[10px] font-bold uppercase text-gold">Turn</p>}
           {notice && <p className="text-[10px] uppercase text-gold">{notice}</p>}
         </div>
       </div>
@@ -61,7 +65,7 @@ export function PlayerSeat({
       className={cn(
         "min-w-[92px] rounded-xl border-2 px-2 py-1 text-center backdrop-blur",
         player.isCurrent
-          ? "animate-[pulse-turn_1.6s_ease-in-out_infinite] border-[var(--gold)] bg-[var(--gold)]/20"
+          ? "border-[var(--gold)] bg-[var(--gold)]/25"
           : "border-white/25 bg-[var(--panel)]",
         player.eliminated && "opacity-60 grayscale",
       )}
@@ -89,6 +93,12 @@ export function PlayerSeat({
         {isSelf ? "You · " : null}
         <LiveScore score={player.score} />
       </p>
+      {player.teamId && (
+        <p className="text-[10px] font-bold uppercase tracking-wider text-gold">Team {player.teamId}</p>
+      )}
+      {player.isCurrent && !player.eliminated && (
+        <p className="text-[10px] font-extrabold uppercase tracking-wider text-gold">Turn</p>
+      )}
       {notice && <p className="text-[10px] uppercase tracking-wider text-gold">{notice}</p>}
       {player.eliminated && (
         <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--danger)]">

@@ -11,6 +11,7 @@ function rowToEntry(row: Record<string, unknown>): QueueEntry {
     playerId: String(row.player_id),
     nickname: String(row.nickname),
     mode: row.mode as QueueMode,
+    playerCount: Number.isInteger(row.player_count) ? Number(row.player_count) : undefined,
     joinedAt: new Date(String(row.joined_at)).getTime(),
     lastSeenAt: new Date(String(row.last_seen_at)).getTime(),
   };
@@ -23,7 +24,21 @@ export async function enqueuePlayer(entry: QueueEntry): Promise<{ duplicate: boo
     memoryCodes.delete(entry.userId);
     const result = joinQueue(memory, entry);
     memory.splice(0, memory.length, ...result.entries);
-    const waiting = memory.filter((item) => item.mode === entry.mode).length;
+    if (result.duplicate) {
+      const index = memory.findIndex((item) => item.userId === entry.userId);
+      const current = memory[index];
+      if (current) {
+        memory[index] = {
+          ...current,
+          mode: entry.mode,
+          playerCount: entry.playerCount,
+          lastSeenAt: Date.now(),
+        };
+      }
+    }
+    const waiting = memory.filter(
+      (item) => item.mode === entry.mode && item.playerCount === entry.playerCount,
+    ).length;
     return { duplicate: result.duplicate, waiting };
   }
 
@@ -41,9 +56,13 @@ export async function enqueuePlayer(entry: QueueEntry): Promise<{ duplicate: boo
   if (existing.data) {
     await client
       .from("match_queue")
-      .update({ last_seen_at: new Date().toISOString() })
+      .update({
+        last_seen_at: new Date().toISOString(),
+        mode: entry.mode,
+        player_count: entry.playerCount ?? null,
+      })
       .eq("id", existing.data.id);
-    const count = await waitingCount(entry.mode);
+    const count = await waitingCount(entry.mode, entry.playerCount);
     return { duplicate: true, waiting: count };
   }
   const inserted = await client.from("match_queue").insert({
@@ -52,19 +71,29 @@ export async function enqueuePlayer(entry: QueueEntry): Promise<{ duplicate: boo
     player_id: entry.playerId,
     nickname: entry.nickname,
     mode: entry.mode,
+    player_count: entry.playerCount ?? null,
     status: "waiting",
   });
   if (inserted.error && inserted.error.code !== "23505") {
     throw inserted.error;
   }
-  return { duplicate: inserted.error?.code === "23505", waiting: await waitingCount(entry.mode) };
+  return {
+    duplicate: inserted.error?.code === "23505",
+    waiting: await waitingCount(entry.mode, entry.playerCount),
+  };
 }
 
-export async function heartbeat(userId: string, mode: QueueMode): Promise<number> {
+export async function heartbeat(
+  userId: string,
+  mode: QueueMode,
+  playerCount?: number | null,
+): Promise<number> {
   if (!isSupabaseConfigured()) {
     const next = touchQueue(pruneQueue(memory, Date.now()), userId, Date.now());
     memory.splice(0, memory.length, ...next);
-    return memory.filter((item) => item.mode === mode).length;
+    return memory.filter(
+      (item) => item.mode === mode && (playerCount == null || item.playerCount === playerCount),
+    ).length;
   }
   const client = createAdminClient();
   await dropStale();
@@ -73,7 +102,7 @@ export async function heartbeat(userId: string, mode: QueueMode): Promise<number
     .update({ last_seen_at: new Date().toISOString() })
     .eq("user_id", userId)
     .eq("status", "waiting");
-  return waitingCount(mode);
+  return waitingCount(mode, playerCount);
 }
 
 export async function cancelQueue(userId: string): Promise<void> {
@@ -92,21 +121,29 @@ export async function cancelQueue(userId: string): Promise<void> {
   }
 }
 
-export async function queueStatus(userId: string): Promise<{ waiting: number; matchCode: string | null; mode: QueueMode | null }> {
+export async function queueStatus(userId: string): Promise<{
+  waiting: number;
+  matchCode: string | null;
+  mode: QueueMode | null;
+  playerCount: number | null;
+}> {
   if (!isSupabaseConfigured()) {
     const mine = memory.find((entry) => entry.userId === userId);
     if (mine) {
       return {
-        waiting: memory.filter((entry) => entry.mode === mine.mode).length,
+        waiting: memory.filter(
+          (entry) => entry.mode === mine.mode && entry.playerCount === mine.playerCount,
+        ).length,
         matchCode: null,
         mode: mine.mode,
+        playerCount: mine.playerCount ?? null,
       };
     }
     const code = memoryCodes.get(userId);
     if (code) {
-      return { waiting: 0, matchCode: code, mode: null };
+      return { waiting: 0, matchCode: code, mode: null, playerCount: null };
     }
-    return { waiting: 0, matchCode: null, mode: null };
+    return { waiting: 0, matchCode: null, mode: null, playerCount: null };
   }
   const { data, error } = await createAdminClient()
     .from("match_queue")
@@ -120,20 +157,27 @@ export async function queueStatus(userId: string): Promise<{ waiting: number; ma
     throw error;
   }
   if (!data || (data.status !== "waiting" && data.status !== "matched")) {
-    return { waiting: 0, matchCode: null, mode: null };
+    return { waiting: 0, matchCode: null, mode: null, playerCount: null };
   }
   const age = Date.now() - new Date(String(data.joined_at)).getTime();
+  const playerCount = Number.isInteger(data.player_count) ? Number(data.player_count) : null;
   if (data.status === "matched") {
     if (!data.match_code || age > 120_000) {
-      return { waiting: 0, matchCode: null, mode: null };
+      return { waiting: 0, matchCode: null, mode: null, playerCount: null };
     }
-    return { waiting: 0, matchCode: String(data.match_code), mode: data.mode as QueueMode };
+    return {
+      waiting: 0,
+      matchCode: String(data.match_code),
+      mode: data.mode as QueueMode,
+      playerCount,
+    };
   }
   const mode = data.mode as QueueMode;
   return {
-    waiting: await waitingCount(mode),
+    waiting: await waitingCount(mode, playerCount),
     matchCode: null,
     mode,
+    playerCount,
   };
 }
 
@@ -153,7 +197,7 @@ export async function takeMatch(mode: QueueMode): Promise<QueueEntry[] | null> {
     .eq("mode", mode)
     .eq("status", "waiting")
     .order("joined_at", { ascending: true })
-    .limit(8);
+    .limit(64);
   if (error) {
     throw error;
   }
@@ -173,7 +217,7 @@ export async function takeMatch(mode: QueueMode): Promise<QueueEntry[] | null> {
     throw updated.error;
   }
   const claimed = (updated.data ?? []).map((row) => rowToEntry(row));
-  if (claimed.length < 2) {
+  if (claimed.length !== decision.claimed.length) {
     if (claimed.length > 0) {
       await client.from("match_queue").update({ status: "waiting" }).in(
         "id",
@@ -264,12 +308,16 @@ async function dropStale() {
   await createAdminClient().from("match_queue").delete().eq("status", "waiting").lt("last_seen_at", stale);
 }
 
-async function waitingCount(mode: QueueMode): Promise<number> {
-  const { count, error } = await createAdminClient()
+async function waitingCount(mode: QueueMode, playerCount?: number | null): Promise<number> {
+  let query = createAdminClient()
     .from("match_queue")
     .select("id", { count: "exact", head: true })
     .eq("mode", mode)
     .eq("status", "waiting");
+  if (playerCount != null) {
+    query = query.eq("player_count", playerCount);
+  }
+  const { count, error } = await query;
   if (error) {
     throw error;
   }

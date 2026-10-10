@@ -1,4 +1,4 @@
-import type { GameState, RoomRecord } from "@/lib/game/types";
+import type { GameState, RoomRecord, TeamId } from "@/lib/game/types";
 
 export interface RoomPlayer {
   id: string;
@@ -7,6 +7,7 @@ export interface RoomPlayer {
   seatIndex: number;
   connected: boolean;
   ready: boolean;
+  teamId?: TeamId | null;
   createdAt: number;
   updatedAt: number;
 }

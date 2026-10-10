@@ -29,6 +29,8 @@ export interface Card {
 }
 
 export type GameMode = "private" | "casual" | "ranked" | "practice";
+export type TeamId = "A" | "B";
+export type TableFormat = "individual" | "teams";
 export type BotDifficulty = "easy" | "normal" | "hard" | "expert";
 export type GameStatus = "LOBBY" | "PLAYING" | "ROUND_END" | "GAME_OVER";
 export type RoomStatus = "LOBBY" | "PLAYING" | "CLOSED";
@@ -66,6 +68,7 @@ export interface PlayerState {
   isBot?: boolean;
   botDifficulty?: BotDifficulty;
   userId?: string | null;
+  teamId?: TeamId | null;
 }
 
 export interface PublicRatingDelta {
@@ -159,6 +162,8 @@ export interface GameState {
   maxScore: number;
   resetScore: number;
   mode: GameMode;
+  format?: TableFormat;
+  winnerTeamId?: TeamId | null;
   ratingApplied: boolean;
   ratingDeltas: PublicRatingDelta[] | null;
 }
@@ -176,6 +181,7 @@ export interface PublicPlayerView {
   isHost: boolean;
   isCurrent: boolean;
   hand: Card[] | null;
+  teamId?: TeamId | null;
 }
 
 export interface PublicGameState {
@@ -211,6 +217,8 @@ export interface PublicGameState {
   maxScore: number;
   resetScore: number;
   mode: GameMode;
+  format?: TableFormat;
+  winnerTeamId?: TeamId | null;
   ratingDeltas: PublicRatingDelta[] | null;
 }
 
@@ -223,6 +231,7 @@ export interface RoomRecord {
   maxScore: number;
   resetScore: number;
   mode: GameMode;
+  format?: TableFormat;
   gameId: string | null;
   createdAt: number;
   updatedAt: number;

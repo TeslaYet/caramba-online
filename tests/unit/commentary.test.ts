@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentaryFromEvents } from "@/lib/game/commentary";
+import { commentaryForFeed, commentaryFromEvents } from "@/lib/game/commentary";
 import {
   arrangeTestHands,
   drawFromDeck,
@@ -112,6 +112,28 @@ describe("commentary", () => {
       "Sarah discarded 6♥.",
       "Hugo drew from the deck.",
     ]);
+  });
+
+  it("leaves turn prompts out of the compact feed", () => {
+    const lines = commentaryForFeed(
+      [
+        event(1, "ROUND_STARTED", "sarah", { roundNumber: 1 }),
+        event(2, "TURN_STARTED", "sarah"),
+        event(3, "PLAYER_DREW", "sarah"),
+        event(4, "ROUND_SCORED", null, { roundNumber: 1 }),
+        event(5, "GAME_FINISHED", "hugo", { winnerId: "hugo" }),
+      ],
+      players,
+    );
+    expect(lines.map((line) => line.text)).toEqual([
+      "Sarah drew from the deck.",
+      "Round 1 ended.",
+      "Hugo wins!",
+    ]);
+    expect(commentaryFromEvents(
+      [event(2, "TURN_STARTED", "sarah")],
+      players,
+    ).map((line) => line.text)).toEqual(["Sarah's turn."]);
   });
 
   it("keeps only the recent window", () => {

@@ -49,7 +49,11 @@ export function WinnerCelebration({
     game.winnerId,
   );
   const winner = rows.find((row) => row.playerId === game.winnerId) ?? rows[0];
-  const localWin = winner?.playerId === game.me?.id;
+  const teamGame = game.format === "teams";
+  const winningTeam = game.winnerTeamId ?? null;
+  const localWin = teamGame
+    ? Boolean(winningTeam && game.me && game.players.find((player) => player.id === game.me?.id)?.teamId === winningTeam)
+    : winner?.playerId === game.me?.id;
   const localDelta = game.ratingDeltas?.find((entry) => entry.playerId === game.me?.id) ?? null;
   const showName = reduceMotion || phase !== "logo";
   const showPodium = reduceMotion || phase === "podium" || phase === "settled";
@@ -62,7 +66,12 @@ export function WinnerCelebration({
       <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center px-4 py-8">
         <p className="sr-only">
           {localWin ? "You won. " : ""}
-          Winner: {winner?.nickname ?? "Unknown"}. Final ranking.{" "}
+          {teamGame
+            ? winningTeam
+              ? `Team ${winningTeam} wins. `
+              : "Both teams were eliminated. Draw. "
+            : `Winner: ${winner?.nickname ?? "Unknown"}. `}
+          Final ranking.{" "}
           {rows
             .map(
               (row) =>
@@ -98,18 +107,25 @@ export function WinnerCelebration({
           </div>
         )}
 
-        {showName && winner && (
+        {showName && (winner || teamGame) && (
           <div className={cn("relative text-center", !reduceMotion && phase === "name" && "winner-name-in")}>
             <Crown />
-            <Medal place={winner.medal} rank={winner.rank} />
+            {!teamGame && winner && <Medal place={winner.medal} rank={winner.rank} />}
             <p className="mt-3 font-display text-4xl sm:text-6xl">
-              {localWin ? "You" : winner.nickname}
+              {teamGame ? (winningTeam ? `Team ${winningTeam}` : "Draw") : localWin ? "You" : winner?.nickname}
             </p>
-            {localWin ? <p className="text-sm uppercase tracking-[0.2em] text-cream/70">{winner.nickname}</p> : null}
-            <p className="font-display text-2xl text-gold">Winner</p>
-            <p className="mt-1 text-lg">
-              <AnimatedScore value={winner.score} /> pts
-            </p>
+            {localWin && !teamGame ? (
+              <p className="text-sm uppercase tracking-[0.2em] text-cream/70">{winner?.nickname}</p>
+            ) : null}
+            {teamGame && localWin ? (
+              <p className="text-sm uppercase tracking-[0.2em] text-cream/70">Your team</p>
+            ) : null}
+            <p className="font-display text-2xl text-gold">{teamGame && !winningTeam ? "No winner" : "Winner"}</p>
+            {!teamGame && winner && (
+              <p className="mt-1 text-lg">
+                <AnimatedScore value={winner.score} /> pts
+              </p>
+            )}
             {localDelta && (
               <p className="mt-2 text-sm text-gold" data-testid="rating-delta">
                 Rating {localDelta.before} → {localDelta.after}{" "}

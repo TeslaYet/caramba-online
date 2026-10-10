@@ -1,4 +1,4 @@
-import type { GameState, PlayerState } from "./types";
+import type { GameState, PlayerState, TableFormat, TeamId } from "./types";
 
 export function getActivePlayers(state: Pick<GameState, "players">): PlayerState[] {
   return state.players
@@ -71,7 +71,31 @@ export function getPreviousActivePlayer(
   return active[previousIndex] ?? null;
 }
 
-export function isGameOver(state: Pick<GameState, "players">): boolean {
+export type TeamOutcome = TeamId | "draw" | "continue";
+
+/** A team stays alive while any of its players are still active. */
+export function teamOutcome(state: Pick<GameState, "players">): TeamOutcome {
+  const active = getActivePlayers(state);
+  const teamA = active.some((player) => player.teamId === "A");
+  const teamB = active.some((player) => player.teamId === "B");
+  if (teamA && teamB) {
+    return "continue";
+  }
+  if (teamA) {
+    return "A";
+  }
+  if (teamB) {
+    return "B";
+  }
+  return "draw";
+}
+
+export function isGameOver(
+  state: Pick<GameState, "players"> & { format?: TableFormat | null },
+): boolean {
+  if (state.format === "teams") {
+    return teamOutcome(state) !== "continue";
+  }
   return getActivePlayers(state).length <= 1;
 }
 

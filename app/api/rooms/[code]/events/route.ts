@@ -1,6 +1,7 @@
 import { getStore } from "@/lib/store";
 import { getPlayerId } from "@/lib/server/session";
 import { getRoomSnapshot, markConnected } from "@/lib/server/game-service";
+import { openPresence } from "@/lib/server/presence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,35 +18,68 @@ export async function GET(
   const stream = new ReadableStream({
     start(controller) {
       let closed = false;
+      let sending = false;
+      let queued = false;
+      let lastSignature = "";
+
       const send = async () => {
         if (closed) {
           return;
         }
+        if (sending) {
+          queued = true;
+          return;
+        }
+        sending = true;
         try {
-          const snapshot = await getRoomSnapshot(code, playerId);
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(snapshot)}\n\n`),
-          );
+          do {
+            queued = false;
+            const snapshot = await getRoomSnapshot(code, playerId);
+            const signature = [
+              snapshot.game?.version ?? "none",
+              snapshot.room.updatedAt,
+              snapshot.room.status,
+              snapshot.room.format ?? "individual",
+              snapshot.room.maxPlayers,
+              ...snapshot.players.map(
+                (player) =>
+                  `${player.id}:${player.connected}:${player.ready}:${player.teamId ?? ""}:${player.seatIndex}`,
+              ),
+            ].join("|");
+            if (signature === lastSignature) {
+              continue;
+            }
+            lastSignature = signature;
+            if (!closed) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(snapshot)}\n\n`));
+            }
+          } while (queued && !closed);
         } catch {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ error: "ROOM_CLOSED" })}\n\n`),
-          );
+          if (!closed) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "ROOM_CLOSED" })}\n\n`));
+          }
+        } finally {
+          sending = false;
         }
       };
 
       const unsubscribe = getStore().subscribe(code, () => {
         void send();
       });
+      const releasePresence = playerId
+        ? openPresence(code, playerId, (connected, notBefore) => {
+            void markConnected(code, playerId, connected, notBefore);
+          })
+        : () => undefined;
 
       void send();
-      if (playerId) {
-        void markConnected(code, playerId, true);
-      }
 
       const heartbeat = setInterval(() => {
-        if (!closed) {
-          controller.enqueue(encoder.encode(`: ping\n\n`));
+        if (closed) {
+          return;
         }
+        controller.enqueue(encoder.encode(`: ping\n\n`));
+        void send();
       }, 15000);
 
       const close = () => {
@@ -55,9 +89,7 @@ export async function GET(
         closed = true;
         clearInterval(heartbeat);
         unsubscribe();
-        if (playerId) {
-          void markConnected(code, playerId, false);
-        }
+        releasePresence();
         controller.close();
       };
 

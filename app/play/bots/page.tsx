@@ -7,11 +7,13 @@ import { BrandMark } from "@/components/brand/brand-mark";
 import { Button } from "@/components/ui/button";
 
 const LEVELS = ["easy", "normal", "hard", "expert"] as const;
+const OPPONENTS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export default function BotsPage() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [difficulty, setDifficulty] = useState<(typeof LEVELS)[number]>("normal");
+  const [opponents, setOpponents] = useState<(typeof OPPONENTS)[number]>(3);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -31,7 +33,7 @@ export default function BotsPage() {
           const response = await fetch("/api/play/bots", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ nickname, difficulty }),
+            body: JSON.stringify({ nickname, difficulty, opponents }),
           });
           const data = await response.json();
           setBusy(false);
@@ -53,6 +55,24 @@ export default function BotsPage() {
             className="focus-ring mt-2 w-full rounded-2xl border border-[var(--line)] bg-black/20 px-4 py-3"
           />
         </label>
+        <fieldset className="block text-sm">
+          <legend>Opponents</legend>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {OPPONENTS.map((count) => (
+              <Button
+                key={count}
+                type="button"
+                variant={opponents === count ? "gold" : "secondary"}
+                onClick={() => setOpponents(count)}
+              >
+                {count}
+              </Button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-cream/60">
+            {opponents} {opponents === 1 ? "opponent" : "opponents"} · {opponents + 1} players total.
+          </p>
+        </fieldset>
         <label className="block text-sm">
           Difficulty
           <select

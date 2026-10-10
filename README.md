@@ -61,9 +61,9 @@ The initial schema creates:
 - `games` (authoritative JSONB state + version)
 - `game_events`
 
-Apply `supabase/migrations/001_init.sql`, `002_server_gate.sql`, and `003_accounts_matchmaking.sql` before pointing the app at Supabase.
+Apply every file in `supabase/migrations` in order, including `20261010173352_game_sizes_and_teams.sql`, before pointing the app at Supabase. That migration adds `rooms.format`, `players.team_id`, and `match_queue.player_count`.
 
-Accounts use Supabase Auth. Private tables still work without signing in. Casual and ranked matchmaking require an account. New profiles start at 1200 rating on the free plan.
+Accounts use Supabase Auth. Private tables still work without signing in. Casual and ranked matchmaking require an account. New profiles start at 1200 rating on the free plan. Ranked tables from 2 to 8 players share that one rating. The update is scaled so a larger table does not multiply the swing. Bot games and private team games do not change rating. Team mode (2v2, 3v3, 4v4) is a private-room option: a team is out only when every teammate is eliminated. If both teams are eliminated on the same score resolution, the game is a draw.
 
 Ad-free access is stored on `profiles.entitlement` (`FREE`, `AD_FREE`, or `PREMIUM`). The app cannot grant it. Give a friend ad-free access from the Supabase SQL editor:
 

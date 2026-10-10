@@ -12,6 +12,7 @@ import {
   getWinner,
   isGameOver,
   requirePlayer,
+  teamOutcome,
 } from "./turn-manager";
 import type {
   Card,
@@ -70,6 +71,42 @@ function appendEvent(
     timestamp: now(),
   };
   return { ...state, events: [...state.events, event] };
+}
+
+function closeMatch(state: GameState): GameState {
+  if (state.status === "GAME_OVER" && state.events.at(-1)?.type === "GAME_FINISHED") {
+    return state;
+  }
+  if (state.format === "teams") {
+    const outcome = teamOutcome(state);
+    const winnerTeamId = outcome === "A" || outcome === "B" ? outcome : null;
+    const next: GameState = {
+      ...state,
+      status: "GAME_OVER",
+      winnerId: null,
+      winnerTeamId,
+      currentPlayerId: null,
+      nextRoundAt: null,
+    };
+    return appendEvent(next, "GAME_FINISHED", null, {
+      winnerId: null,
+      winnerTeamId,
+      draw: winnerTeamId === null,
+    });
+  }
+  const winner = getWinner(state);
+  const next: GameState = {
+    ...state,
+    status: "GAME_OVER",
+    winnerId: winner?.id ?? null,
+    winnerTeamId: null,
+    currentPlayerId: null,
+    nextRoundAt: null,
+  };
+  return appendEvent(next, "GAME_FINISHED", winner?.id ?? null, {
+    winnerId: winner?.id ?? null,
+    winnerTeamId: null,
+  });
 }
 
 function replacePlayer(state: GameState, player: PlayerState): GameState {
@@ -181,15 +218,12 @@ export function startRound(
   options?: { starterId?: string; incrementRound?: boolean },
 ): GameState {
   const active = getActivePlayers(state);
-  if (active.length < GAME_RULES.MIN_PLAYERS && state.roundNumber > 0) {
-    const winner = getWinner(state);
-    return {
+  if (state.roundNumber > 0 && isGameOver(state)) {
+    return closeMatch({
       ...state,
-      status: "GAME_OVER",
-      winnerId: winner?.id ?? null,
       currentPlayerId: null,
       turnPhase: "DISCARD",
-    };
+    });
   }
 
   const freshDeck = createShuffledDeck(randomInt);
@@ -251,12 +285,14 @@ export function createInitialGame(input: {
       isBot?: boolean;
       botDifficulty?: PlayerState["botDifficulty"];
       userId?: string | null;
+      teamId?: PlayerState["teamId"];
     }
   >;
   randomInt: RandomInt;
   maxScore?: number;
   resetScore?: number;
   mode?: GameState["mode"];
+  format?: GameState["format"];
 }): GameState {
   const rules = readScoreRules({
     maxScore: input.maxScore,
@@ -271,6 +307,7 @@ export function createInitialGame(input: {
     isBot: player.isBot === true,
     botDifficulty: player.botDifficulty,
     userId: player.userId ?? null,
+    teamId: player.teamId ?? null,
   }));
 
   const base: GameState = {
@@ -297,6 +334,8 @@ export function createInitialGame(input: {
     maxScore: rules.maxScore,
     resetScore: rules.resetScore,
     mode: input.mode ?? "private",
+    format: input.format ?? "individual",
+    winnerTeamId: null,
     ratingApplied: false,
     ratingDeltas: null,
   };
@@ -583,24 +622,17 @@ export function callCaramba(state: GameState, playerId: string): GameState {
 
   for (const line of next.roundResult?.lines ?? []) {
     if (line.eliminatedThisRound) {
+      const eliminated = next.players.find((player) => player.id === line.playerId);
       next = appendEvent(next, "PLAYER_ELIMINATED", line.playerId, {
         score: line.appliedTotal,
         remaining: getActivePlayers(next).length,
+        teamId: eliminated?.teamId ?? null,
       });
     }
   }
 
   if (isGameOver(next)) {
-    const winner = getWinner(next);
-    next = {
-      ...next,
-      status: "GAME_OVER",
-      winnerId: winner?.id ?? null,
-      nextRoundAt: null,
-    };
-    next = appendEvent(next, "GAME_FINISHED", winner?.id ?? null, {
-      winnerId: winner?.id ?? null,
-    });
+    next = closeMatch(next);
   }
 
   return withPickupFlags(next);
@@ -614,14 +646,7 @@ export function startNextRound(state: GameState, randomInt: RandomInt): GameStat
     throw new GameEngineError("The current round is still in progress.", "WRONG_PHASE");
   }
   if (isGameOver(state)) {
-    const winner = getWinner(state);
-    return {
-      ...state,
-      status: "GAME_OVER",
-      winnerId: winner?.id ?? null,
-      nextRoundAt: null,
-      version: state.version + 1,
-    };
+    return { ...closeMatch(state), version: state.version + 1 };
   }
 
   return startRound(
@@ -657,6 +682,7 @@ export function rematch(state: GameState, randomInt: RandomInt): GameState {
     maxScore: state.maxScore,
     resetScore: state.resetScore,
     mode: state.mode,
+    format: state.format,
   });
 }
 

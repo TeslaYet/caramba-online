@@ -7,6 +7,7 @@ import { clientIp, consumeRateLimit } from "@/lib/server/rate-limit";
 const schema = z.object({
   nickname: z.string().min(2).max(16),
   difficulty: z.enum(["easy", "normal", "hard", "expert"]),
+  opponents: z.number().int().min(1).max(7).optional(),
   maxScore: z.number().int().optional(),
   resetScore: z.number().int().optional(),
 });
@@ -22,6 +23,7 @@ export const POST = withApi(async (request, playerId) => {
     body.difficulty,
     body.maxScore,
     body.resetScore,
+    body.opponents ?? 3,
   );
   return privateJson(result);
 });

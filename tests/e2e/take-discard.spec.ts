@@ -31,6 +31,24 @@ async function joinRoom(page: Page, nickname: string, code: string) {
   await page.waitForURL(new RegExp(`/room/${code}`));
 }
 
+async function expectCommentary(page: Page, text: string) {
+  const feed = page.getByTestId("commentary");
+  const row = feed.locator("li").filter({ hasText: text });
+  await expect(row.first()).toBeAttached();
+  const count = await row.count();
+  let visible = false;
+  for (let index = 0; index < count; index += 1) {
+    if (await row.nth(index).isVisible()) {
+      visible = true;
+      break;
+    }
+  }
+  if (!visible) {
+    await feed.getByRole("button", { name: "View history" }).click();
+  }
+  await expect(row.first()).toBeVisible();
+}
+
 async function openMatch(browser: Browser, viewport: { width: number; height: number }) {
   const hostContext = await browser.newContext({ viewport });
   const guestContext = await browser.newContext({ viewport, hasTouch: viewport.width < 500 });
@@ -104,8 +122,8 @@ test("a click takes the exact discard card on desktop and a tap does on mobile",
     }
     await match.host.getByTestId("play-button").click();
     await match.host.getByTestId("draw-button").click();
-    await expect(match.guest.getByTestId("commentary")).toContainText("Hugo discarded 5♥ 6♥ 7♥");
-    await expect(match.host.getByTestId("commentary")).toContainText("drew from the deck");
+    await expectCommentary(match.guest, "Hugo discarded 5♥ 6♥ 7♥");
+    await expectCommentary(match.host, "drew from the deck");
     await expect(match.host.getByTestId("commentary")).not.toContainText("2♠");
 
     await expect(match.guest.getByRole("heading", { name: "Your turn" })).toBeVisible();
@@ -117,12 +135,8 @@ test("a click takes the exact discard card on desktop and a tap does on mobile",
     await expect(match.guest.getByTestId("player-hand").getByLabel("6 of hearts")).toBeVisible();
     await expect(match.guest.getByTestId("player-hand").getByLabel("5 of hearts")).toHaveCount(0);
     await expect(match.guest.getByTestId("player-hand").getByLabel("7 of hearts")).toHaveCount(0);
-    await expect(match.guest.getByTestId("commentary")).toContainText(
-      "Alex took the 6♥ from Hugo's discard.",
-    );
-    await expect(match.host.getByTestId("commentary")).toContainText(
-      "Alex took the 6♥ from Hugo's discard.",
-    );
+    await expectCommentary(match.guest, "Alex took the 6♥ from Hugo's discard.");
+    await expectCommentary(match.host, "Alex took the 6♥ from Hugo's discard.");
     await expect(match.guest.getByTestId("commentary")).not.toContainText("took the 5♥");
     await expect(match.guest.getByTestId("commentary")).not.toContainText("took the 7♥");
     await expect(match.host.getByRole("heading", { name: "Your turn" })).toBeVisible();
@@ -168,9 +182,7 @@ test("Take Discard takes the only card and does not choose among several", async
   await match.guest.getByTestId("play-button").click();
   await match.guest.getByTestId("take-discard-button").click();
   await expect(match.guest.getByTestId("player-hand").getByLabel("5 of hearts")).toBeVisible();
-  await expect(match.guest.getByTestId("commentary")).toContainText(
-    "Alex took the 5♥ from Hugo's discard.",
-  );
+  await expectCommentary(match.guest, "Alex took the 5♥ from Hugo's discard.");
   await expect(match.host.getByRole("heading", { name: "Your turn" })).toBeVisible();
   await match.close();
 });

@@ -23,6 +23,9 @@ const SUIT_MARK: Record<Suit, string> = {
 
 const WINDOW = 24;
 
+/** Turn prompts already live on the seat indicator. Round-start is lobby noise. */
+const OMITTED_FROM_FEED = new Set(["turn_started", "round_started"]);
+
 export function cardMark(card: Pick<Card, "rank" | "suit">): string {
   return `${card.rank}${SUIT_MARK[card.suit]}`;
 }
@@ -197,10 +200,12 @@ function describe(event: GameLogEvent, players: Map<string, string>): Commentary
   }
   if (event.type === "PLAYER_ELIMINATED") {
     const remaining = Number(event.payload.remaining);
+    const team = event.payload.teamId === "A" || event.payload.teamId === "B" ? event.payload.teamId : null;
+    const who = team ? `${actor} (Team ${team})` : actor;
     const text =
       Number.isFinite(remaining) && remaining > 1
-        ? `${actor} was eliminated. ${remaining} players remain.`
-        : `${actor} was eliminated.`;
+        ? `${who} was eliminated. ${remaining} players remain.`
+        : `${who} was eliminated.`;
     return [
       line(
         event,
@@ -212,6 +217,13 @@ function describe(event: GameLogEvent, players: Map<string, string>): Commentary
     ];
   }
   if (event.type === "GAME_FINISHED") {
+    if (event.payload.winnerTeamId === "A" || event.payload.winnerTeamId === "B") {
+      const team = event.payload.winnerTeamId;
+      return [line(event, "team_won", { team }, `Team ${team} wins!`, "critical")];
+    }
+    if (event.payload.draw === true) {
+      return [line(event, "team_draw", {}, "Both teams were eliminated. The game is a draw.", "critical")];
+    }
     const winnerId =
       typeof event.payload.winnerId === "string" ? event.payload.winnerId : event.actorPlayerId;
     const winner = nameOf(players, winnerId);
@@ -239,4 +251,12 @@ export function commentaryFromEvents(
     lines.push(...describe(event, names));
   }
   return lines;
+}
+
+/** Presentation filter. The underlying event log is unchanged. */
+export function commentaryForFeed(
+  events: GameLogEvent[],
+  players: Array<{ id: string; nickname: string }>,
+): CommentaryLine[] {
+  return commentaryFromEvents(events, players).filter((entry) => !OMITTED_FROM_FEED.has(entry.key));
 }

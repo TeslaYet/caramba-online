@@ -22,7 +22,7 @@ export default function CreateLobbyPage() {
       <p className="text-sm uppercase tracking-[0.3em] text-gold">Private table</p>
       <h1 className="font-display text-5xl">Play With Friends</h1>
       <p className="mt-2 text-sm text-cream/70">
-        No account needed. Private games do not change rating.
+        No account needed. Private games do not change rating. After the room opens, the host can keep individual play or switch to a 2v2, 3v3, or 4v4 team game.
       </p>
       <form
         className="mt-8 space-y-4"

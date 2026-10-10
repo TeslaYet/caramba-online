@@ -54,8 +54,10 @@ function ConnectedGame({
   onLeave: () => void;
   onLobby: (code: string) => void;
 }) {
-  const { snapshot, act, error, actionError } = useRoom(code);
-  const game = snapshot?.game ?? fallback;
+  const { snapshot, act, error, actionError, connection } = useRoom(code);
+  const live = snapshot?.game ?? null;
+  const game =
+    live && fallback ? (live.version >= fallback.version ? live : fallback) : (live ?? fallback);
 
   if (error) {
     return (
@@ -92,6 +94,7 @@ function ConnectedGame({
         onLeave();
       }}
       actionError={actionError}
+      connection={connection}
     />
   );
 }
