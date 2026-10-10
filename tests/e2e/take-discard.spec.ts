@@ -104,6 +104,9 @@ test("a click takes the exact discard card on desktop and a tap does on mobile",
     }
     await match.host.getByTestId("play-button").click();
     await match.host.getByTestId("draw-button").click();
+    await expect(match.guest.getByTestId("commentary")).toContainText("Hugo discarded 5♥ 6♥ 7♥");
+    await expect(match.host.getByTestId("commentary")).toContainText("drew from the deck");
+    await expect(match.host.getByTestId("commentary")).not.toContainText("2♠");
 
     await expect(match.guest.getByRole("heading", { name: "Your turn" })).toBeVisible();
     await match.guest.getByLabel("8 of spades").click();
@@ -114,6 +117,14 @@ test("a click takes the exact discard card on desktop and a tap does on mobile",
     await expect(match.guest.getByTestId("player-hand").getByLabel("6 of hearts")).toBeVisible();
     await expect(match.guest.getByTestId("player-hand").getByLabel("5 of hearts")).toHaveCount(0);
     await expect(match.guest.getByTestId("player-hand").getByLabel("7 of hearts")).toHaveCount(0);
+    await expect(match.guest.getByTestId("commentary")).toContainText(
+      "Alex took the 6♥ from Hugo's discard.",
+    );
+    await expect(match.host.getByTestId("commentary")).toContainText(
+      "Alex took the 6♥ from Hugo's discard.",
+    );
+    await expect(match.guest.getByTestId("commentary")).not.toContainText("took the 5♥");
+    await expect(match.guest.getByTestId("commentary")).not.toContainText("took the 7♥");
     await expect(match.host.getByRole("heading", { name: "Your turn" })).toBeVisible();
     await match.close();
   }
@@ -157,6 +168,9 @@ test("Take Discard takes the only card and does not choose among several", async
   await match.guest.getByTestId("play-button").click();
   await match.guest.getByTestId("take-discard-button").click();
   await expect(match.guest.getByTestId("player-hand").getByLabel("5 of hearts")).toBeVisible();
+  await expect(match.guest.getByTestId("commentary")).toContainText(
+    "Alex took the 5♥ from Hugo's discard.",
+  );
   await expect(match.host.getByRole("heading", { name: "Your turn" })).toBeVisible();
   await match.close();
 });

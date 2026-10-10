@@ -112,6 +112,7 @@ export type GameEventType =
   | "PLAYER_PLAYED"
   | "PLAYER_DREW"
   | "PLAYER_TOOK_DISCARD"
+  | "TURN_STARTED"
   | "CARAMBA_CALLED"
   | "ROUND_SCORED"
   | "PLAYER_ELIMINATED"

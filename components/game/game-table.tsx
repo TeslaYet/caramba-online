@@ -17,6 +17,7 @@ import { showdownFacesVisible } from "@/lib/ui/carramba-showdown";
 import { seatSide } from "@/lib/ui/hidden-hand";
 import { cn } from "@/lib/utils/cn";
 import { ChatPanel } from "@/components/game/chat-panel";
+import { CommentaryFeed } from "@/components/game/commentary-feed";
 import { Scoreboard } from "@/components/scoreboard/scoreboard";
 import { Button } from "@/components/ui/button";
 import { calculateHandScore } from "@/lib/game/scoring";
@@ -426,6 +427,14 @@ export function GameTable({
           })}
 
           <TableMotion cues={cues} seatOffset={seatOffset} showCall={showdown === null} />
+          <div className="absolute left-2 right-2 top-9 z-30 sm:bottom-2 sm:left-1/2 sm:right-auto sm:top-auto sm:w-80 sm:-translate-x-1/2">
+            <CommentaryFeed
+              events={game.events}
+              players={game.players}
+              showResults={showdown === null || showdown === "result"}
+              compact={!isDesktop}
+            />
+          </div>
           <p
             key={game.currentPlayerId ?? "waiting"}
             className="turn-chip absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.22em] text-gold sm:hidden"

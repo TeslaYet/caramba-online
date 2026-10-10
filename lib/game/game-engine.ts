@@ -51,6 +51,10 @@ function nextId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+function publicCard(card: Card): Card {
+  return { id: card.id, rank: card.rank, suit: card.suit, color: card.color };
+}
+
 function appendEvent(
   state: GameState,
   type: GameLogEvent["type"],
@@ -372,6 +376,7 @@ export function playCards(
   next = appendEvent(next, "PLAYER_PLAYED", playerId, {
     discardType: validation.type,
     cardCount: selected.length,
+    cards: selected.map(publicCard),
   });
   assertExclusiveCardOwnership(next);
   return withPickupFlags(next);
@@ -483,6 +488,7 @@ export function takePreviousDiscard(
   next = appendEvent(next, "PLAYER_TOOK_DISCARD", playerId, {
     fromPlayerId: group.playerId,
     cardId: card.id,
+    card: publicCard(card),
   });
   return finishTurn(next, playerId);
 }
@@ -497,12 +503,15 @@ function finishTurn(state: GameState, playerId: string): GameState {
   }
 
   const nextPlayer = getNextActivePlayer(state, playerId);
-  const next: GameState = {
+  let next: GameState = {
     ...state,
     currentPlayerId: nextPlayer?.id ?? null,
     turnPhase: "DISCARD",
     turnNumber: state.turnNumber + 1,
   };
+  if (nextPlayer) {
+    next = appendEvent(next, "TURN_STARTED", nextPlayer.id, {});
+  }
   assertExclusiveCardOwnership(next);
   return withPickupFlags(next);
 }
@@ -576,6 +585,7 @@ export function callCaramba(state: GameState, playerId: string): GameState {
     if (line.eliminatedThisRound) {
       next = appendEvent(next, "PLAYER_ELIMINATED", line.playerId, {
         score: line.appliedTotal,
+        remaining: getActivePlayers(next).length,
       });
     }
   }

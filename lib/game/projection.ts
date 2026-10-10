@@ -92,9 +92,13 @@ export function sanitizeEventPayload(
   delete clone.hand;
   delete clone.hands;
   delete clone.drawPile;
-  delete clone.card;
   if (type === "PLAYER_DREW") {
+    delete clone.card;
     delete clone.cardId;
+    delete clone.cards;
+    delete clone.rank;
+    delete clone.suit;
+    delete clone.color;
   }
   return clone;
 }

@@ -396,7 +396,9 @@ describe("exact discard pickup", () => {
       group.filter((item) => item.id !== chosen.id).map((item) => item.id),
     );
     expect(hand.filter((item) => group.some((card) => card.id === item.id))).toEqual([chosen]);
-    expect(taken.events.at(-1)?.payload.cardId).toBe(chosen.id);
+    expect(taken.events.find((event) => event.type === "PLAYER_TOOK_DISCARD")?.payload.cardId).toBe(
+      chosen.id,
+    );
   }
 
   it("takes the only card in a one-card discard", () => {
